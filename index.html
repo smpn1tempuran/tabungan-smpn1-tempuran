@@ -93,14 +93,14 @@
 
                 <div>
                     <label for="login-password" class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Kata Sandi</label>
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                            <i data-lucide="lock" class="w-4 h-4"></i>
-                        </span>
-                        <input id="login-password" type="password" required autocomplete="current-password" placeholder="Masukkan kata sandi"
-                            class="w-full pl-10 pr-11 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none text-sm font-medium transition">
-                        <button type="button" onclick="toggleLoginPasswordVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
-                            <i id="login-eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                    <div class="mt-2.5 flex items-center justify-between gap-2 text-[11px] font-semibold">
+                        <div class="flex items-center gap-2 min-w-0" id="cloud-sync-status">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+                            <span class="text-slate-300 truncate">Menghubungkan Cloud...</span>
+                        </div>
+                        <button type="button" onclick="manualCloudSyncNow()" title="Cek & Sinkronkan Cloud Sekarang"
+                            class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-[10px] font-bold text-slate-200 shrink-0 transition">
+                            Sync
                         </button>
                     </div>
                 </div>
@@ -1826,17 +1826,85 @@
             isCloudSyncing = true;
             updateCloudStatusUI('syncing', 'Menyimpan ke Cloud...');
             try {
+                // Pisahkan logo jika terlalu besar agar tidak ditolak batas ukuran REST API
+                const payloadToSend = Object.assign({}, appState);
+                if (payloadToSend.schoolLogo && payloadToSend.schoolLogo.length > 150000) {
+                    payloadToSend.schoolLogo = '';
+                }
                 const res = await fetch(FIREBASE_RTDB_URL, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(appState)
+                    body: JSON.stringify(payloadToSend)
                 });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
+                if (!res.ok) {
+                    if (res.status === 401 || res.status === 403) {
+                        updateCloudStatusUI('offline', 'Offline: Rules Firebase Terkunci');
+                    } else {
+                        updateCloudStatusUI('offline', `Offline (HTTP ${res.status})`);
+                    }
+                    throw new Error('HTTP ' + res.status);
+                }
                 updateCloudStatusUI('online', 'Online • Tersinkronisasi');
             } catch (err) {
-                updateCloudStatusUI('offline', 'Tersimpan Lokal (Offline Cloud)');
+                const currentText = document.getElementById('cloud-sync-status')?.textContent || '';
+                if (!currentText.includes('Rules') && !currentText.includes('HTTP')) {
+                    updateCloudStatusUI('offline', 'Offline (Cek Internet / Rules)');
+                }
             } finally {
                 isCloudSyncing = false;
+            }
+        }
+
+        function saveState(syncCloud = true) {
+            if (!appState) return;
+            appState.updatedAt = Date.now();
+            persistToLocalSafe();
+            if (syncCloud) {
+                pushStateToCloud();
+            }
+        }
+
+        async function manualCloudSyncNow() {
+            updateCloudStatusUI('syncing', 'Mengecek Koneksi...');
+            await pullStateFromCloud(true);
+        }
+
+        async function pullStateFromCloud(initialBoot = false) {
+            if (isCloudSyncing) return;
+            try {
+                const res = await fetch(`${FIREBASE_RTDB_URL}?t=${Date.now()}`, { cache: 'no-store' });
+                if (!res.ok) {
+                    if (res.status === 401 || res.status === 403) {
+                        updateCloudStatusUI('offline', 'Offline: Rules Firebase Terkunci');
+                    } else {
+                        updateCloudStatusUI('offline', `Offline (HTTP ${res.status})`);
+                    }
+                    throw new Error('HTTP ' + res.status);
+                }
+                const cloudData = await res.json();
+
+                if (cloudData && typeof cloudData === 'object') {
+                    const merged = mergeLocalAndCloudStates(appState, cloudData);
+                    appState = merged;
+                    persistToLocalSafe();
+                    applySchoolLogos();
+                    if (currentUser) refreshAllUI();
+
+                    if (countRealTransactions(merged) > countRealTransactions(cloudData) || (Number(merged.updatedAt) || 0) > (Number(cloudData.updatedAt) || 0)) {
+                        await pushStateToCloud();
+                    } else {
+                        updateCloudStatusUI('online', 'Online • Tersinkronisasi');
+                    }
+                } else if (initialBoot) {
+                    await pushStateToCloud();
+                } else {
+                    updateCloudStatusUI('online', 'Online • Siap Sinkron');
+                }
+            } catch (err) {
+                const currentText = document.getElementById('cloud-sync-status')?.textContent || '';
+                if (!currentText.includes('Rules') && !currentText.includes('HTTP')) {
+                    updateCloudStatusUI('offline', 'Offline (Cek Internet / Rules)');
+                }
             }
         }
 
