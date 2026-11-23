@@ -1303,6 +1303,72 @@
                     </table>
                 </div>
             </div>
+
+            <!-- =========================================================
+                 BAGIAN 2: DATABASE KEPALA SEKOLAH, PETUGAS & PETUGAS TATA USAHA
+                 ========================================================= -->
+            <div class="pt-4 border-t border-slate-200/80 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Database Kepala Sekolah, Petugas & Tata Usaha</h3>
+                            <span class="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-bold">Penandatangan Resmi</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Kelola data Kepala Sekolah, Bendahara / Petugas, dan Petugas Tata Usaha untuk pengesahan lembar laporan.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" onclick="openStaffModal()"
+                            class="px-3.5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm transition">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            <span>+ Tambah Pejabat / Petugas</span>
+                        </button>
+                        <button type="button" onclick="saveAllSchoolOfficials()"
+                            class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm transition">
+                            <i data-lucide="save" class="w-4 h-4"></i>
+                            <span>Simpan Semua</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab Filter Jabatan -->
+                <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-soft border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="inline-flex flex-wrap p-1 rounded-xl bg-slate-100 text-xs font-bold self-start">
+                        <button type="button" id="stf-tab-all" onclick="setStaffRoleFilter('all')"
+                            class="px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-2xs transition">Semua Jabatan</button>
+                        <button type="button" id="stf-tab-kepsek" onclick="setStaffRoleFilter('kepsek')"
+                            class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Kepala Sekolah</button>
+                        <button type="button" id="stf-tab-petugas" onclick="setStaffRoleFilter('petugas')"
+                            class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Petugas / Bendahara</button>
+                        <button type="button" id="stf-tab-tu" onclick="setStaffRoleFilter('tu')"
+                            class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Petugas Tata Usaha</button>
+                    </div>
+
+                    <div class="relative w-full sm:w-72">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                        <input type="text" id="staff-search-input" oninput="renderSchoolOfficialsTable()"
+                            placeholder="Cari nama, jabatan, atau NIP..."
+                            class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+
+                <!-- Tabel Database Kepala Sekolah, Petugas & Petugas TU -->
+                <div class="bg-white rounded-3xl shadow-soft border border-slate-200/80 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+                                    <th class="py-3.5 px-5 w-14 text-center">No</th>
+                                    <th class="py-3.5 px-5 w-48">Jabatan / Kategori</th>
+                                    <th class="py-3.5 px-5">Nama Lengkap & Gelar</th>
+                                    <th class="py-3.5 px-5 w-52">NIP / Keterangan</th>
+                                    <th class="py-3.5 px-5 w-52 text-right">Menu Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="school-officials-tbody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Footer Global Aplikasi -->
@@ -1672,6 +1738,84 @@
                 <button type="button" onclick="confirmDeleteHomeroomClass()"
                     class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-bold shadow-sm">
                     Ya, Hapus Kelas
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL: TAMBAH / EDIT KEPALA SEKOLAH, PETUGAS & PETUGAS TU
+         ========================================================= -->
+    <div id="school-staff-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+            <div class="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                <div>
+                    <h3 id="staff-modal-title" class="font-extrabold text-lg text-slate-900">Tambah Pejabat / Petugas</h3>
+                    <p id="staff-modal-subtitle" class="text-xs text-slate-500">Tambahkan data Kepala Sekolah, Petugas, atau Petugas Tata Usaha</p>
+                </div>
+                <button type="button" onclick="closeStaffModal()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/70">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="handleSaveStaffModal(event)" class="p-5 sm:p-6 space-y-4">
+                <input type="hidden" id="input-edit-staff-id" value="">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Jabatan / Kategori</label>
+                    <select id="input-staff-role" required
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="kepsek">Kepala Sekolah</option>
+                        <option value="petugas">Petugas / Bendahara</option>
+                        <option value="tu">Petugas Tata Usaha</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Nama Lengkap & Gelar</label>
+                    <input type="text" id="input-staff-name" required placeholder="Contoh: Drs. H. SUPRIYANTO, M.Pd."
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">NIP / Keterangan</label>
+                    <input type="text" id="input-staff-nip" placeholder="Contoh: 19680512 199412 1 002 (atau -)"
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                    <button type="button" onclick="closeStaffModal()"
+                        class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold">
+                        Batal
+                    </button>
+                    <button type="submit"
+                        class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-sm">
+                        Simpan Data
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL: KONFIRMASI HAPUS PEJABAT / PETUGAS
+         ========================================================= -->
+    <div id="delete-staff-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden p-6 space-y-4">
+            <div class="flex items-start gap-4">
+                <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-base text-slate-900">Hapus Data Pejabat / Petugas?</h3>
+                    <p id="delete-staff-confirm-text" class="text-xs text-slate-600 mt-1 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus data pejabat/petugas ini dari database?
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeDeleteStaffModal()"
+                    class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold">
+                    Batal
+                </button>
+                <button type="button" onclick="confirmDeleteSchoolOfficial()"
+                    class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-bold shadow-sm">
+                    Ya, Hapus Data
                 </button>
             </div>
         </div>
@@ -2485,6 +2629,12 @@
                 'Kelas 9F': { name: 'ARIF WICAKSONO, S.Pd.', nip: '19870815 201402 1 004' },
                 'Kelas 9G': { name: 'LESTARI NINGSIH, S.Pd.', nip: '19890119 201903 2 005' }
             },
+            schoolOfficials: [
+                { id: 'stf-kepsek-1', role: 'kepsek', name: 'Drs. H. SUPRIYANTO, M.Pd.', nip: '19680512 199412 1 002' },
+                { id: 'stf-petugas-1', role: 'petugas', name: 'SRI MULYANI, S.E.', nip: '19790418 200604 2 009' },
+                { id: 'stf-tu-1', role: 'tu', name: 'Siti Aminah', nip: '19850610 201001 2 014' },
+                { id: 'stf-tu-2', role: 'tu', name: 'Budi Santoso', nip: '19881122 201402 1 003' }
+            ],
             users: [
                 {
                     id: 'usr-admin-1',
@@ -2736,6 +2886,9 @@
                         }
                         if (!parsed.homeroomTeachers || typeof parsed.homeroomTeachers !== 'object') {
                             parsed.homeroomTeachers = JSON.parse(JSON.stringify(INITIAL_STATE.homeroomTeachers));
+                        }
+                        if (!Array.isArray(parsed.schoolOfficials) || parsed.schoolOfficials.length === 0) {
+                            parsed.schoolOfficials = JSON.parse(JSON.stringify(INITIAL_STATE.schoolOfficials));
                         }
                         parsed.students.forEach(s => {
                             if (!s.yearlyRecords) {
@@ -3040,6 +3193,7 @@
                 renderUsersManagementTable();
             } else if (pageName === 'homeroom') {
                 renderHomeroomTable();
+                renderSchoolOfficialsTable();
             } else {
                 renderStudentLedger();
             }
@@ -4981,7 +5135,31 @@
                 }
             }
 
+            syncSchoolOfficialsToReportDefaults();
             handleReportConfigChange();
+        }
+
+        function syncSchoolOfficialsToReportDefaults() {
+            const officials = (state && Array.isArray(state.schoolOfficials)) ? state.schoolOfficials : [];
+            const kepsek = officials.find(o => o.role === 'kepsek');
+            const petugas = officials.find(o => o.role === 'petugas');
+            const tu = officials.find(o => o.role === 'tu');
+
+            const kepsekNameEl = document.getElementById('report-kepsek-name');
+            const kepsekNipEl = document.getElementById('report-kepsek-nip');
+            const tuNameEl = document.getElementById('report-tu-name');
+
+            if (kepsek && kepsekNameEl) kepsekNameEl.value = kepsek.name || '';
+            if (kepsek && kepsekNipEl) kepsekNipEl.value = kepsek.nip || '-';
+            if (tu && tuNameEl) tuNameEl.value = tu.name || '';
+
+            const targetType = document.getElementById('report-target-type')?.value;
+            if (targetType && targetType !== 'walikelas' && petugas) {
+                const secNameEl = document.getElementById('report-second-signer-name');
+                const secNipEl = document.getElementById('report-second-signer-nip');
+                if (secNameEl) secNameEl.value = petugas.name || '';
+                if (secNipEl) secNipEl.value = petugas.nip || '-';
+            }
         }
 
         function syncHomeroomSignerToReport() {
@@ -5008,6 +5186,9 @@
             const classBox = document.getElementById('report-class-selector-box');
             const secondLabel = document.getElementById('report-second-signer-label');
             const secondInput = document.getElementById('report-second-signer-name');
+            const secondNipInput = document.getElementById('report-second-signer-nip');
+            const officials = (state && Array.isArray(state.schoolOfficials)) ? state.schoolOfficials : [];
+            const petugas = officials.find(o => o.role === 'petugas');
 
             if (targetType === 'walikelas') {
                 classBox.classList.remove('hidden');
@@ -5015,10 +5196,14 @@
                 syncHomeroomSignerToReport();
             } else if (targetType === 'kepsek') {
                 classBox.classList.add('hidden');
-                secondLabel.textContent = 'Nama Bendahara Sekolah';
+                secondLabel.textContent = 'Nama Bendahara / Petugas';
+                if (petugas && secondInput) secondInput.value = petugas.name || '';
+                if (petugas && secondNipInput) secondNipInput.value = petugas.nip || '-';
             } else {
                 classBox.classList.add('hidden');
                 secondLabel.textContent = 'Nama Ketua Komite / Bendahara';
+                if (petugas && secondInput) secondInput.value = petugas.name || '';
+                if (petugas && secondNipInput) secondNipInput.value = petugas.nip || '-';
             }
 
             renderOfficialReportPreview();
@@ -5597,6 +5782,284 @@
         }
 
         // ==========================================
+        // DATABASE KEPALA SEKOLAH, PETUGAS & PETUGAS TATA USAHA (EDIT, HAPUS, SIMPAN)
+        // ==========================================
+        let staffRoleFilter = 'all';
+        let pendingDeleteStaffId = null;
+
+        const STAFF_ROLE_META = {
+            kepsek: {
+                label: 'Kepala Sekolah',
+                badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
+                order: 1
+            },
+            petugas: {
+                label: 'Petugas / Bendahara',
+                badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+                order: 2
+            },
+            tu: {
+                label: 'Petugas Tata Usaha',
+                badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                order: 3
+            }
+        };
+
+        function setStaffRoleFilter(roleKey) {
+            staffRoleFilter = roleKey;
+            ['all', 'kepsek', 'petugas', 'tu'].forEach(key => {
+                const btn = document.getElementById(`stf-tab-${key}`);
+                if (!btn) return;
+                if (key === roleKey) {
+                    btn.className = 'px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-2xs transition';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+                }
+            });
+            renderSchoolOfficialsTable();
+        }
+
+        function renderSchoolOfficialsTable() {
+            const tbody = document.getElementById('school-officials-tbody');
+            if (!tbody) return;
+
+            if (!Array.isArray(state.schoolOfficials)) {
+                state.schoolOfficials = JSON.parse(JSON.stringify(INITIAL_STATE.schoolOfficials));
+            }
+
+            const q = (document.getElementById('staff-search-input')?.value || '').trim().toLowerCase();
+            const sortedList = [...state.schoolOfficials].sort((a, b) => {
+                const oa = STAFF_ROLE_META[a.role]?.order || 9;
+                const ob = STAFF_ROLE_META[b.role]?.order || 9;
+                if (oa !== ob) return oa - ob;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+
+            const filtered = sortedList.filter(item => {
+                if (staffRoleFilter !== 'all' && item.role !== staffRoleFilter) return false;
+                if (!q) return true;
+                const roleLabel = (STAFF_ROLE_META[item.role]?.label || '').toLowerCase();
+                return roleLabel.includes(q) ||
+                    (item.name || '').toLowerCase().includes(q) ||
+                    (item.nip || '').toLowerCase().includes(q);
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="py-10 text-center text-slate-400 text-sm">
+                            Data Kepala Sekolah / Petugas tidak ditemukan. Klik "+ Tambah Pejabat / Petugas" untuk menambahkan.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map((item, idx) => {
+                const meta = STAFF_ROLE_META[item.role] || STAFF_ROLE_META.tu;
+                return `
+                    <tr class="hover:bg-slate-50/90 transition">
+                        <td class="py-3 px-5 text-center font-mono text-xs text-slate-400 font-semibold">${String(idx + 1).padStart(2, '0')}</td>
+                        <td class="py-3 px-5">
+                            <span class="inline-flex px-2.5 py-1 rounded-lg border text-xs font-extrabold ${meta.badgeClass}">${meta.label}</span>
+                        </td>
+                        <td class="py-3 px-5">
+                            <input type="text" id="stf-name-${item.id}" value="${(item.name || '').replace(/"/g, '&quot;')}"
+                                placeholder="Masukkan Nama Lengkap & Gelar..."
+                                class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                        </td>
+                        <td class="py-3 px-5">
+                            <input type="text" id="stf-nip-${item.id}" value="${(item.nip || '').replace(/"/g, '&quot;')}"
+                                placeholder="NIP / Keterangan"
+                                class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 font-mono text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                        </td>
+                        <td class="py-3 px-5 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                <button type="button" onclick="saveSingleSchoolOfficial('${item.id}')" title="Simpan Perubahan Baris Ini"
+                                    class="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white text-xs font-bold border border-emerald-200 hover:border-emerald-600 inline-flex items-center gap-1 transition">
+                                    <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                                    <span>Simpan</span>
+                                </button>
+                                <button type="button" onclick="openStaffModal('${item.id}')" title="Edit Jabatan & Nama"
+                                    class="p-1.5 rounded-xl border border-slate-200 hover:bg-sky-50 hover:border-sky-300 text-slate-600 hover:text-sky-700 transition">
+                                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button type="button" onclick="openDeleteStaffModal('${item.id}')" title="Hapus Data"
+                                    class="p-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 transition">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            safeRefreshIcons();
+        }
+
+        function openStaffModal(editStaffId = null) {
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat menambah atau mengedit pejabat/petugas.', 'error');
+                return;
+            }
+            const modal = document.getElementById('school-staff-modal');
+            const titleEl = document.getElementById('staff-modal-title');
+            const subEl = document.getElementById('staff-modal-subtitle');
+            const idInput = document.getElementById('input-edit-staff-id');
+            const roleSelect = document.getElementById('input-staff-role');
+            const nameInput = document.getElementById('input-staff-name');
+            const nipInput = document.getElementById('input-staff-nip');
+
+            if (editStaffId && Array.isArray(state.schoolOfficials)) {
+                const found = state.schoolOfficials.find(s => s.id === editStaffId);
+                if (!found) return;
+                const liveName = document.getElementById(`stf-name-${found.id}`)?.value ?? found.name;
+                const liveNip = document.getElementById(`stf-nip-${found.id}`)?.value ?? found.nip;
+
+                titleEl.textContent = 'Edit Data Pejabat / Petugas';
+                subEl.textContent = 'Perbarui kategori jabatan, nama lengkap, atau NIP';
+                idInput.value = found.id;
+                roleSelect.value = found.role || 'tu';
+                nameInput.value = liveName || '';
+                nipInput.value = liveNip || '';
+            } else {
+                titleEl.textContent = 'Tambah Pejabat / Petugas';
+                subEl.textContent = 'Tambahkan data Kepala Sekolah, Petugas, atau Petugas Tata Usaha';
+                idInput.value = '';
+                roleSelect.value = 'tu';
+                nameInput.value = '';
+                nipInput.value = '';
+            }
+
+            modal.classList.remove('hidden');
+            safeRefreshIcons();
+        }
+
+        function closeStaffModal() {
+            document.getElementById('school-staff-modal').classList.add('hidden');
+        }
+
+        function handleSaveStaffModal(e) {
+            e.preventDefault();
+            if (!isAdminUser()) return;
+
+            const editId = document.getElementById('input-edit-staff-id').value.trim();
+            const role = document.getElementById('input-staff-role').value;
+            const name = document.getElementById('input-staff-name').value.trim();
+            const nip = document.getElementById('input-staff-nip').value.trim() || '-';
+
+            if (!name) {
+                showToast('Nama lengkap pejabat/petugas wajib diisi.', 'error');
+                return;
+            }
+
+            if (!Array.isArray(state.schoolOfficials)) {
+                state.schoolOfficials = [];
+            }
+
+            if (editId) {
+                const target = state.schoolOfficials.find(s => s.id === editId);
+                if (target) {
+                    target.role = role;
+                    target.name = name;
+                    target.nip = nip;
+                    showToast(`Data ${name} berhasil diperbarui.`);
+                }
+            } else {
+                state.schoolOfficials.push({
+                    id: `stf-${role}-${Date.now()}`,
+                    role,
+                    name,
+                    nip
+                });
+                const label = STAFF_ROLE_META[role]?.label || 'Petugas';
+                showToast(`${label} "${name}" berhasil ditambahkan.`);
+            }
+
+            saveState();
+            renderAll();
+            closeStaffModal();
+        }
+
+        function saveSingleSchoolOfficial(staffId) {
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat menyimpan data pejabat/petugas.', 'error');
+                return;
+            }
+            if (!Array.isArray(state.schoolOfficials)) return;
+            const target = state.schoolOfficials.find(s => s.id === staffId);
+            const nameEl = document.getElementById(`stf-name-${staffId}`);
+            const nipEl = document.getElementById(`stf-nip-${staffId}`);
+            if (!target || !nameEl || !nipEl) return;
+
+            const newName = nameEl.value.trim();
+            if (!newName) {
+                showToast('Nama lengkap tidak boleh kosong.', 'error');
+                return;
+            }
+
+            target.name = newName;
+            target.nip = nipEl.value.trim() || '-';
+            saveState();
+            renderOfficialReportPage();
+            showToast(`Data ${target.name} berhasil disimpan.`);
+        }
+
+        function saveAllSchoolOfficials() {
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat menyimpan data pejabat/petugas.', 'error');
+                return;
+            }
+            if (!Array.isArray(state.schoolOfficials)) return;
+            let count = 0;
+            state.schoolOfficials.forEach(item => {
+                const nameEl = document.getElementById(`stf-name-${item.id}`);
+                const nipEl = document.getElementById(`stf-nip-${item.id}`);
+                if (nameEl && nipEl && nameEl.value.trim()) {
+                    item.name = nameEl.value.trim();
+                    item.nip = nipEl.value.trim() || '-';
+                    count++;
+                }
+            });
+            saveState();
+            renderOfficialReportPage();
+            showToast(`Berhasil menyimpan ${count} data Pejabat & Petugas.`);
+        }
+
+        function openDeleteStaffModal(staffId) {
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat menghapus data pejabat/petugas.', 'error');
+                return;
+            }
+            const target = (state.schoolOfficials || []).find(s => s.id === staffId);
+            if (!target) return;
+            pendingDeleteStaffId = staffId;
+            const roleLabel = STAFF_ROLE_META[target.role]?.label || 'Petugas';
+            document.getElementById('delete-staff-confirm-text').textContent =
+                `Apakah Anda yakin ingin menghapus ${roleLabel} "${target.name}" dari database?`;
+            document.getElementById('delete-staff-modal').classList.remove('hidden');
+            safeRefreshIcons();
+        }
+
+        function closeDeleteStaffModal() {
+            pendingDeleteStaffId = null;
+            document.getElementById('delete-staff-modal').classList.add('hidden');
+        }
+
+        function confirmDeleteSchoolOfficial() {
+            if (!isAdminUser() || !pendingDeleteStaffId) return;
+            const idx = (state.schoolOfficials || []).findIndex(s => s.id === pendingDeleteStaffId);
+            if (idx !== -1) {
+                const removedName = state.schoolOfficials[idx].name;
+                state.schoolOfficials.splice(idx, 1);
+                saveState();
+                renderAll();
+                showToast(`Data "${removedName}" telah dihapus.`);
+            }
+            closeDeleteStaffModal();
+        }
+
+        // ==========================================
         // MANAJEMEN PENGGUNA & HAK AKSES (ADMIN ONLY)
         // ==========================================
         function renderUsersManagementTable() {
@@ -5786,6 +6249,7 @@
                 renderOfficialReportPage();
                 renderUsersManagementTable();
                 renderHomeroomTable();
+                renderSchoolOfficialsTable();
                 safeRefreshIcons();
             } catch (err) {
                 console.error('Terjadi kesalahan saat merender tampilan:', err);
