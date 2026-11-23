@@ -1103,6 +1103,17 @@
                             <input type="file" accept=".json,application/json" onchange="restoreFullBackupJSON(event)" class="hidden">
                         </label>
                     </div>
+
+                    <div class="md:col-span-2 bg-amber-50/80 p-6 rounded-2xl border border-amber-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h3 class="text-sm font-extrabold text-amber-950">Pemulihan Otomatis Data Lama dari Browser & Cloud</h3>
+                            <p class="text-xs text-amber-800 mt-1">Memindai seluruh penyimpanan browser & database Firebase untuk memulihkan data siswa, setoran, dan wali kelas dari versi sebelumnya.</p>
+                        </div>
+                        <button type="button" onclick="scanAndRecoverLegacyData()"
+                            class="px-4 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition shrink-0 flex items-center gap-2">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Pindai & Pulihkan Data Lama
+                        </button>
+                    </div>
                 </div>
             </section>
         </main>
@@ -1571,17 +1582,65 @@
             if (!st.activeAcademicYear || !st.academicYears.includes(st.activeAcademicYear)) {
                 st.activeAcademicYear = st.academicYears[0];
             }
-            if (!Array.isArray(st.users) || st.users.length === 0) st.users = def.users;
-            if (!Array.isArray(st.students)) st.students = [];
-            if (!st.ledger || typeof st.ledger !== 'object') st.ledger = {};
-            st.academicYears.forEach(ay => {
-                if (!st.ledger[ay]) st.ledger[ay] = {};
-            });
-            if (!st.homeroomTeachers || typeof st.homeroomTeachers !== 'object') {
-                st.homeroomTeachers = def.homeroomTeachers;
+            if (!Array.isArray(st.users) || st.users.length === 0) {
+                st.users = def.users;
+            } else {
+                st.users = st.users.map((u, idx) => ({
+                    id: u.id || ('usr-' + idx),
+                    fullname: u.fullname || u.fullName || u.nama || u.username || 'Petugas',
+                    username: u.username || ('user' + idx),
+                    password: u.password || '123456',
+                    role: (u.role === 'ADMIN' || u.role === 'admin') ? 'ADMIN' : 'OPERATOR',
+                    active: u.active !== false
+                }));
             }
+
+            // Normalisasi format siswa lama (mendukung name/nama, className/kelas/class)
+            if (!Array.isArray(st.students)) st.students = [];
+            st.students = st.students.map((s, idx) => ({
+                id: String(s.id || ('std-' + idx)),
+                nis: String(s.nis || s.NIS || (2026000 + idx + 1)),
+                name: String(s.name || s.nama || s.fullName || '').trim(),
+                className: String(s.className || s.kelas || s.class || 'Kelas 7A').trim()
+            })).filter(s => s.name);
+
+            // Normalisasi format ledger lama (mendukung transaksi di root maupun per tahun ajaran)
+            if (!st.ledger || typeof st.ledger !== 'object') st.ledger = {};
+            if (raw && raw.transactions && typeof raw.transactions === 'object' && !st.ledger[st.activeAcademicYear]) {
+                st.ledger[st.activeAcademicYear] = raw.transactions;
+            }
+            st.academicYears.forEach(ay => {
+                if (!st.ledger[ay] || typeof st.ledger[ay] !== 'object') st.ledger[ay] = {};
+            });
+
+            // Normalisasi database wali kelas lama
+            if (!st.homeroomTeachers || typeof st.homeroomTeachers !== 'object') {
+                st.homeroomTeachers = Object.assign({}, def.homeroomTeachers);
+            } else {
+                const normHr = Object.assign({}, def.homeroomTeachers);
+                Object.entries(st.homeroomTeachers).forEach(([cls, val]) => {
+                    if (typeof val === 'string') {
+                        normHr[cls] = { name: val, nip: '' };
+                    } else if (val && typeof val === 'object') {
+                        normHr[cls] = {
+                            name: val.name || val.nama || val.wali || '',
+                            nip: val.nip || val.NIP || ''
+                        };
+                    }
+                });
+                st.homeroomTeachers = normHr;
+            }
+
+            // Normalisasi pejabat sekolah lama
             if (!Array.isArray(st.officialStaff) || st.officialStaff.length === 0) {
                 st.officialStaff = def.officialStaff;
+            } else {
+                st.officialStaff = st.officialStaff.map((p, idx) => ({
+                    id: p.id || ('stf-' + idx),
+                    role: p.role || 'PETUGAS_TU',
+                    name: p.name || p.nama || '',
+                    nip: p.nip || p.NIP || '-'
+                }));
             }
             return st;
         }
@@ -1627,15 +1686,43 @@
         }
 
         function loadLocalState() {
-            try {
-                const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(BACKUP_SNAPSHOT_KEY);
-                if (raw) {
-                    appState = ensureStateIntegrity(JSON.parse(raw));
-                    return;
-                }
-            } catch (e) {}
+            const candidateKeys = [
+                STORAGE_KEY,
+                BACKUP_SNAPSHOT_KEY,
+                'smpn1_tempuran_tabungan_sumbangan_v2',
+                'smpn1_tempuran_tabungan_sumbangan_v1',
+                'smpn1_tempuran_db'
+            ];
+            let bestState = null;
+            let bestScore = -1;
+
+            candidateKeys.forEach(k => {
+                try {
+                    const raw = localStorage.getItem(k);
+                    if (!raw) return;
+                    const parsed = ensureStateIntegrity(JSON.parse(raw));
+                    const score = (countRealTransactions(parsed) * 100) + (parsed.students?.length || 0);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestState = parsed;
+                    }
+                } catch (e) {}
+            });
+
+            if (bestState) {
+                appState = bestState;
+                persistToLocalSafe();
+                return;
+            }
             appState = createDefaultState();
             persistToLocalSafe();
+        }
+
+        async function scanAndRecoverLegacyData() {
+            loadLocalState();
+            await pullStateFromCloud(true);
+            refreshAllUI();
+            showToast(`Pemindaian selesai: ${appState.students.length} siswa & ${countRealTransactions(appState)} transaksi dipulihkan.`);
         }
 
         function persistToLocalSafe() {
