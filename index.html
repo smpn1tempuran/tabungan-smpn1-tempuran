@@ -1629,11 +1629,11 @@
                 if (!st.ledger[ay] || typeof st.ledger[ay] !== 'object') st.ledger[ay] = {};
             });
 
-            // Normalisasi database wali kelas lama
+            // Normalisasi database wali kelas lama (tanpa memaksa mengembalikan kelas yang sudah dihapus)
             if (!st.homeroomTeachers || typeof st.homeroomTeachers !== 'object') {
                 st.homeroomTeachers = Object.assign({}, def.homeroomTeachers);
             } else {
-                const normHr = Object.assign({}, def.homeroomTeachers);
+                const normHr = {};
                 Object.entries(st.homeroomTeachers).forEach(([cls, val]) => {
                     if (typeof val === 'string') {
                         normHr[cls] = { name: val, nip: '' };
@@ -1825,13 +1825,13 @@
             });
 
             // Gabungkan Wali Kelas
-            merged.homeroomTeachers = Object.assign({}, cloudSt.homeroomTeachers || {});
-            Object.entries(localSt.homeroomTeachers || {}).forEach(([cls, info]) => {
-                const existing = merged.homeroomTeachers[cls];
-                if (!existing || (!existing.name && info.name) || (Number(localSt.updatedAt) || 0) >= (Number(cloudSt.updatedAt) || 0)) {
-                    merged.homeroomTeachers[cls] = info;
-                }
-            });
+            // Gabungkan Wali Kelas (hormati penghapusan dari sisi yang lebih baru)
+            const localNewer = (Number(localSt.updatedAt) || 0) >= (Number(cloudSt.updatedAt) || 0);
+            if (localNewer && localSt.homeroomTeachers && Object.keys(localSt.homeroomTeachers).length > 0) {
+                merged.homeroomTeachers = Object.assign({}, localSt.homeroomTeachers);
+            } else {
+                merged.homeroomTeachers = Object.assign({}, cloudSt.homeroomTeachers || localSt.homeroomTeachers || {});
+            }
 
             // Gabungkan Pejabat & Petugas
             const staffMap = new Map();
@@ -2092,7 +2092,8 @@
         // HELPER DATA, TAHUN AJARAN, & TRANSAKSI
         // =====================================================================
         function getAllClassNames() {
-            const set = new Set([...DEFAULT_CLASSES, ...Object.keys(appState.homeroomTeachers || {})]);
+            const hrKeys = Object.keys(appState.homeroomTeachers || {});
+            const set = new Set(hrKeys.length > 0 ? hrKeys : DEFAULT_CLASSES);
             (appState.students || []).forEach(s => { if (s.className) set.add(s.className); });
             return Array.from(set).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
         }
@@ -3095,11 +3096,16 @@
         }
 
         function deleteHomeroomClass(cls) {
-            delete appState.homeroomTeachers[cls];
+            if (appState.homeroomTeachers && Object.prototype.hasOwnProperty.call(appState.homeroomTeachers, cls)) {
+                delete appState.homeroomTeachers[cls];
+            }
+            if (Object.keys(appState.homeroomTeachers || {}).length === 0) {
+                appState.homeroomTeachers = { 'Kelas 7A': { name: '', nip: '' } };
+            }
             saveState(true);
             populateAllClassDropdowns();
             renderHomeroomTable();
-            showToast(`Kelas ${cls} dihapus dari database.`);
+            showToast(`Kelas ${cls} dihapus permanen dari database.`);
         }
 
         // Pejabat Sekolah (Kepala Sekolah, Petugas/Bendahara, Petugas TU)
