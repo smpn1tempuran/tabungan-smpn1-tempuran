@@ -1895,16 +1895,103 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        const DEFAULT_RTDB_URL = "https://tabungan-smpn1tempuran-default-rtdb.asia-southeast1.firebasedatabase.app";
+
         window.cloudSync = {
             enabled: false,
             ready: false,
             pushState: null
         };
 
+        async function initRealtimeDatabaseREST(dbUrl) {
+            const indicator = document.getElementById('cloud-sync-indicator');
+            const endpoint = `${dbUrl.replace(/\/+$/, '')}/smpn1_tempuran_master_db.json`;
+            let lastSyncedHash = '';
+            let isApplyingRemote = false;
+
+            const setStatus = (type, label) => {
+                if (!indicator) return;
+                if (type === 'online') {
+                    indicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-emerald-300">${label}</span>`;
+                } else if (type === 'syncing') {
+                    indicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span><span class="text-sky-200">${label}</span>`;
+                } else {
+                    indicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400"></span><span class="text-rose-200">${label}</span>`;
+                }
+            };
+
+            const pullFromCloud = async (pushIfEmpty = false) => {
+                try {
+                    const res = await fetch(endpoint, { cache: 'no-store' });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const remoteWrapper = await res.json();
+
+                    if (remoteWrapper && remoteWrapper.payloadJson) {
+                        if (remoteWrapper.payloadJson !== lastSyncedHash) {
+                            lastSyncedHash = remoteWrapper.payloadJson;
+                            const remoteData = JSON.parse(remoteWrapper.payloadJson);
+                            isApplyingRemote = true;
+                            try {
+                                if (typeof window.applyRemoteCloudState === 'function') {
+                                    window.applyRemoteCloudState(remoteData);
+                                }
+                            } finally {
+                                isApplyingRemote = false;
+                            }
+                        }
+                    } else if (pushIfEmpty && window.state) {
+                        await window.cloudSync.pushState(window.state);
+                    }
+
+                    window.cloudSync.ready = true;
+                    setStatus('online', 'Online • Tersinkronisasi');
+                } catch (err) {
+                    console.error('Gagal sinkronisasi RTDB:', err);
+                    setStatus('error', 'Cek Rules Firebase RTDB');
+                }
+            };
+
+            window.cloudSync.enabled = true;
+            window.cloudSync.pushState = async (currentState) => {
+                if (isApplyingRemote) return;
+                try {
+                    setStatus('syncing', 'Menyimpan ke Cloud...');
+                    const { currentUserId, activeStudentId, ...sharedPayload } = currentState;
+                    const payloadJson = JSON.stringify(sharedPayload);
+                    lastSyncedHash = payloadJson;
+
+                    const res = await fetch(endpoint, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            payloadJson,
+                            updatedAt: new Date().toISOString()
+                        })
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    setStatus('online', 'Online • Tersinkronisasi');
+                } catch (err) {
+                    console.error('Gagal mengirim data ke RTDB:', err);
+                    setStatus('error', 'Gagal Simpan ke Cloud');
+                }
+            };
+
+            await pullFromCloud(true);
+            setInterval(() => {
+                if (!document.hidden) {
+                    pullFromCloud(false);
+                }
+            }, 4000);
+        }
+
         async function initRealtimeCloudStorage() {
             const indicator = document.getElementById('cloud-sync-indicator');
             try {
                 if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    if (DEFAULT_RTDB_URL) {
+                        await initRealtimeDatabaseREST(DEFAULT_RTDB_URL);
+                        return;
+                    }
                     if (indicator) {
                         indicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-200">Mode Offline Lokal</span>`;
                     }
