@@ -885,6 +885,14 @@
                         class="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition flex items-center gap-1.5 justify-center">
                         <i data-lucide="download" class="w-4 h-4"></i> Ekspor Siswa
                     </button>
+                    <button type="button" onclick="openBulkDeleteStudentsModal('CLASS')"
+                        class="px-3.5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition flex items-center gap-1.5 justify-center">
+                        <i data-lucide="user-minus" class="w-4 h-4"></i> Hapus Per Kelas
+                    </button>
+                    <button type="button" onclick="openBulkDeleteStudentsModal('ALL')"
+                        class="px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 justify-center">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Semua Data
+                    </button>
                 </div>
 
                 <!-- Tabel Master Siswa -->
@@ -1420,6 +1428,40 @@
                     <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold">Tambahkan</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal Konfirmasi Hapus Data Siswa (Per Kelas / Semua Data) -->
+    <div id="bulk-delete-students-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-rose-100">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                    </span>
+                    <h3 class="text-base font-extrabold text-slate-900" id="bulk-delete-modal-title">Konfirmasi Hapus Data Siswa</h3>
+                </div>
+                <button type="button" onclick="closeBulkDeleteStudentsModal()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <input type="hidden" id="bulk-delete-mode" value="CLASS">
+            <div id="bulk-delete-class-selector-wrap" class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-600">Pilih Kelas yang Siswanya Akan Dihapus</label>
+                <select id="bulk-delete-class-select" onchange="updateBulkDeletePreviewText()"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 outline-none focus:border-rose-500">
+                </select>
+            </div>
+            <div id="bulk-delete-warning-box" class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-1">
+            </div>
+            <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                <input id="bulk-delete-also-ledger" type="checkbox" checked class="rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+                <span>Sekaligus bersihkan riwayat setoran siswa yang dihapus</span>
+            </label>
+            <div class="pt-2 flex justify-end gap-2">
+                <button type="button" onclick="closeBulkDeleteStudentsModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600">Batal</button>
+                <button type="button" onclick="executeBulkDeleteStudents()" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs">Ya, Hapus Sekarang</button>
+            </div>
         </div>
     </div>
 
@@ -3306,6 +3348,91 @@
             saveState(true);
             refreshAllUI();
             showToast('Data siswa dihapus.');
+        }
+
+        function openBulkDeleteStudentsModal(mode = 'CLASS') {
+            if (!currentUser || currentUser.role !== 'ADMIN') return;
+            document.getElementById('bulk-delete-mode').value = mode;
+            const classWrap = document.getElementById('bulk-delete-class-selector-wrap');
+            const classSel = document.getElementById('bulk-delete-class-select');
+            const titleEl = document.getElementById('bulk-delete-modal-title');
+
+            if (mode === 'CLASS') {
+                titleEl.textContent = 'Hapus Data Siswa Per Kelas';
+                classWrap.classList.remove('hidden');
+                const classes = getAllClassNames();
+                classSel.innerHTML = classes.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+                const currentFilter = document.getElementById('master-student-class-filter')?.value;
+                if (currentFilter && currentFilter !== 'ALL' && classes.includes(currentFilter)) {
+                    classSel.value = currentFilter;
+                }
+            } else {
+                titleEl.textContent = 'Hapus Semua Data Siswa';
+                classWrap.classList.add('hidden');
+            }
+
+            updateBulkDeletePreviewText();
+            document.getElementById('bulk-delete-students-modal').classList.remove('hidden');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function closeBulkDeleteStudentsModal() {
+            document.getElementById('bulk-delete-students-modal').classList.add('hidden');
+        }
+
+        function updateBulkDeletePreviewText() {
+            const mode = document.getElementById('bulk-delete-mode').value;
+            const box = document.getElementById('bulk-delete-warning-box');
+            if (mode === 'CLASS') {
+                const cls = document.getElementById('bulk-delete-class-select').value;
+                const count = (appState.students || []).filter(s => s.className === cls).length;
+                box.innerHTML = `<div class="font-extrabold">Anda akan menghapus seluruh data siswa pada <span class="underline">${escapeHTML(cls)}</span> (${count} siswa).</div><div>Tindakan ini akan langsung disimpan ke perangkat dan disinkronkan ke cloud.</div>`;
+            } else {
+                const count = (appState.students || []).length;
+                box.innerHTML = `<div class="font-extrabold">PERHATIAN: Anda akan menghapus SEMUA data master siswa (${count} siswa dari seluruh kelas).</div><div>Pastikan Anda sudah mengunduh Backup JSON jika masih memerlukan data lama.</div>`;
+            }
+        }
+
+        function executeBulkDeleteStudents() {
+            if (!currentUser || currentUser.role !== 'ADMIN') return;
+            const mode = document.getElementById('bulk-delete-mode').value;
+            const alsoLedger = document.getElementById('bulk-delete-also-ledger').checked;
+
+            let targetIds = new Set();
+            let toastMsg = '';
+
+            if (mode === 'CLASS') {
+                const cls = document.getElementById('bulk-delete-class-select').value;
+                (appState.students || []).forEach(s => {
+                    if (s.className === cls) targetIds.add(s.id);
+                });
+                if (targetIds.size === 0) {
+                    closeBulkDeleteStudentsModal();
+                    showToast(`Tidak ada data siswa pada ${cls}.`, 'info');
+                    return;
+                }
+                appState.students = (appState.students || []).filter(s => s.className !== cls);
+                toastMsg = `${targetIds.size} siswa pada ${cls} berhasil dihapus.`;
+            } else {
+                (appState.students || []).forEach(s => targetIds.add(s.id));
+                appState.students = [];
+                toastMsg = `Semua data master siswa (${targetIds.size} siswa) berhasil dihapus.`;
+            }
+
+            if (alsoLedger && targetIds.size > 0 && appState.ledger) {
+                Object.keys(appState.ledger).forEach(ay => {
+                    targetIds.forEach(sId => {
+                        if (appState.ledger[ay] && appState.ledger[ay][sId]) {
+                            delete appState.ledger[ay][sId];
+                        }
+                    });
+                });
+            }
+
+            saveState(true);
+            closeBulkDeleteStudentsModal();
+            refreshAllUI();
+            showToast(toastMsg);
         }
 
         function openImportStudentsModal() {
