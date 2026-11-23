@@ -1411,7 +1411,159 @@
         const BACKUP_SNAPSHOT_KEY = 'smpn1_tempuran_safe_snapshot_v1';
         const SESSION_KEY = 'smpn1_tempuran_active_session_v1';
         const FIREBASE_RTDB_URL = 'https://tabungan-smpn1tempuran-default-rtdb.asia-southeast1.firebasedatabase.app/smpn1_tempuran_master_db.json';
-// ... existing code ... -->
+
+        const DEFAULT_SCHOOL_LOGO_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220">
+                <defs>
+                    <linearGradient id="shieldGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#1e3a8a"/>
+                        <stop offset="100%" stop-color="#0284c7"/>
+                    </linearGradient>
+                </defs>
+                <path d="M100 10 L182 40 L182 115 C182 165 145 198 100 212 C55 198 18 165 18 115 L18 40 Z" fill="url(#shieldGrad)" stroke="#facc15" stroke-width="6"/>
+                <circle cx="100" cy="96" r="46" fill="#ffffff" opacity="0.96"/>
+                <path d="M68 104 L100 88 L132 104 L100 120 Z" fill="#1e3a8a"/>
+                <path d="M74 108 L74 122 C88 130 112 130 126 122 L126 108" fill="none" stroke="#0284c7" stroke-width="5" stroke-linecap="round"/>
+                <polygon points="100,56 105,68 118,68 108,76 111,88 100,80 89,88 92,76 82,68 95,68" fill="#eab308"/>
+                <text x="100" y="166" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle">SMPN 1</text>
+                <text x="100" y="184" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#fde047" text-anchor="middle">TEMPURAN</text>
+            </svg>
+        `);
+
+        const MONTHS_LIST = [
+            { key: 'juli', label: 'Juli' },
+            { key: 'agustus', label: 'Agustus' },
+            { key: 'september', label: 'September' },
+            { key: 'oktober', label: 'Oktober' },
+            { key: 'november', label: 'November' },
+            { key: 'desember', label: 'Desember' },
+            { key: 'januari', label: 'Januari' },
+            { key: 'februari', label: 'Februari' },
+            { key: 'maret', label: 'Maret' },
+            { key: 'april', label: 'April' },
+            { key: 'mei', label: 'Mei' },
+            { key: 'juni', label: 'Juni' }
+        ];
+
+        const DEFAULT_CLASSES = [
+            'Kelas 7A', 'Kelas 7B', 'Kelas 7C', 'Kelas 7D', 'Kelas 7E', 'Kelas 7F', 'Kelas 7G',
+            'Kelas 8A', 'Kelas 8B', 'Kelas 8C', 'Kelas 8D', 'Kelas 8E', 'Kelas 8F', 'Kelas 8G',
+            'Kelas 9A', 'Kelas 9B', 'Kelas 9C', 'Kelas 9D', 'Kelas 9E', 'Kelas 9F', 'Kelas 9G'
+        ];
+
+        let appState = null;
+        let currentUser = null;
+        let activeTab = 'ledger';
+        let selectedStudentId = null;
+        let ledgerStatusFilter = 'ALL';
+        let drawerContext = { studentId: null, monthKey: null, signatureMode: 'stamp' };
+        let isDrawingSignature = false;
+        let recapCalYear = new Date().getFullYear();
+        let recapCalMonth = new Date().getMonth();
+        let recapSelectedDateISO = new Date().toISOString().slice(0, 10);
+        let homeroomLevelFilter = 'ALL';
+        let staffRoleFilter = 'ALL';
+        let pendingImportedStudents = [];
+        let monthlyChartInstance = null;
+        let isCloudSyncing = false;
+
+        function createDefaultState() {
+            const homeroomMap = {};
+            DEFAULT_CLASSES.forEach(cls => {
+                homeroomMap[cls] = { name: '', nip: '' };
+            });
+            return {
+                academicYears: ['2026/2027'],
+                activeAcademicYear: '2026/2027',
+                schoolLogo: '',
+                updatedAt: 0,
+                users: [
+                    { id: 'usr-admin', fullname: 'Administrator Utama', username: 'admin', password: 'admin123', role: 'ADMIN', active: true },
+                    { id: 'usr-petugas', fullname: 'Petugas Tata Usaha', username: 'petugas', password: 'input123', role: 'OPERATOR', active: true }
+                ],
+                students: [
+                    { id: 'std-1', nis: '2026001', name: 'Ahmad Fauzi', className: 'Kelas 7A' },
+                    { id: 'std-2', nis: '2026002', name: 'Siti Nurhaliza', className: 'Kelas 7A' },
+                    { id: 'std-3', nis: '2026003', name: 'Budi Santoso', className: 'Kelas 8A' },
+                    { id: 'std-4', nis: '2026004', name: 'Dewi Lestari', className: 'Kelas 9A' }
+                ],
+                ledger: {
+                    '2026/2027': {}
+                },
+                homeroomTeachers: homeroomMap,
+                officialStaff: [
+                    { id: 'stf-1', role: 'KEPALA_SEKOLAH', name: 'Kepala SMP Negeri 1 Tempuran', nip: '-' },
+                    { id: 'stf-2', role: 'PETUGAS', name: 'Bendahara Sekolah', nip: '-' },
+                    { id: 'stf-3', role: 'PETUGAS_TU', name: 'Petugas Tata Usaha', nip: '-' }
+                ]
+            };
+        }
+
+        function escapeHTML(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatRupiah(num) {
+            const n = Number(num) || 0;
+            return 'Rp ' + n.toLocaleString('id-ID');
+        }
+
+        function getTodayISO() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function normalizedDateISO(val) {
+            if (!val) return '';
+            const str = String(val).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+            const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (dmy) {
+                return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+            }
+            const parsed = new Date(str);
+            if (!isNaN(parsed.getTime())) {
+                return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+            }
+            return '';
+        }
+
+        function formatShortDate(iso) {
+            const norm = normalizedDateISO(iso);
+            if (!norm) return '-';
+            const [y, m, d] = norm.split('-');
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            return `${parseInt(d, 10)} ${monthNames[parseInt(m, 10) - 1] || m} ${y}`;
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const bg = type === 'error' ? 'bg-rose-600' : (type === 'info' ? 'bg-slate-800' : 'bg-emerald-600');
+            toast.className = `${bg} text-white px-4 py-3 rounded-xl shadow-lg text-xs font-bold flex items-center gap-2 pointer-events-auto transition-all`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function applySchoolLogos() {
+            const logoSrc = (appState && appState.schoolLogo) ? appState.schoolLogo : DEFAULT_SCHOOL_LOGO_SVG;
+            ['login-school-logo', 'mobile-school-logo', 'sidebar-school-logo', 'dashboard-school-logo', 'admin-dash-logo-preview', 'admin-users-logo-preview']
+                .forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.src = logoSrc;
+                });
+        }
+
         function ensureStateIntegrity(raw) {
             const def = createDefaultState();
             const st = Object.assign({}, def, raw || {});
@@ -1434,199 +1586,159 @@
             return st;
         }
 
-        function countRealTransactions(stateObj) {
-            if (!stateObj || !stateObj.ledger) return 0;
+        // =====================================================================
+        // PENYIMPANAN LOKAL AMAN, DEEP MERGE & SINKRONISASI FIREBASE CLOUD
+        // =====================================================================
+        function updateCloudStatusUI(status, text) {
+            const box = document.getElementById('cloud-sync-status');
+            if (!box) return;
+            const dotColor = status === 'online'
+                ? 'bg-emerald-400'
+                : (status === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-rose-400');
+            const textColor = status === 'online' ? 'text-emerald-300' : 'text-slate-300';
+            box.innerHTML = `<span class="w-2.5 h-2.5 rounded-full ${dotColor}"></span><span class="${textColor}">${escapeHTML(text)}</span>`;
+        }
+
+        function countRealTransactions(st) {
+            if (!st || !st.ledger) return 0;
             let count = 0;
-            Object.values(stateObj.ledger).forEach(ayObj => {
+            Object.values(st.ledger).forEach(ayObj => {
                 if (!ayObj || typeof ayObj !== 'object') return;
                 Object.values(ayObj).forEach(stdObj => {
                     if (!stdObj || typeof stdObj !== 'object') return;
                     Object.values(stdObj).forEach(rec => {
-                        if (!rec) return;
-                        const t = Number(rec.tabungan?.amount) || 0;
-                        const s = Number(rec.sumbangan?.amount) || 0;
-                        if (t > 0 || s > 0) count++;
+                        if ((Number(rec?.tabungan?.amount) || 0) > 0 || (Number(rec?.sumbangan?.amount) || 0) > 0) {
+                            count++;
+                        }
                     });
                 });
             });
             return count;
         }
 
-        function isPureDefaultDummyState(stateObj) {
-            if (!stateObj) return true;
-            const txCount = countRealTransactions(stateObj);
-            if (txCount > 0) return false;
-            const students = stateObj.students || [];
-            if (students.length === 0) return true;
-            const dummyIds = new Set(['std-1', 'std-2', 'std-3', 'std-4', 'std-5']);
-            return students.length <= 5 && students.every(s => dummyIds.has(s.id));
+        function isPureDefaultDummyState(st) {
+            if (!st) return true;
+            if (countRealTransactions(st) > 0) return false;
+            if (st.schoolLogo) return false;
+            if (Array.isArray(st.students) && st.students.length === 4 && st.students[0]?.id === 'std-1') {
+                return true;
+            }
+            return false;
         }
 
-        function mergeLocalAndCloudStates(localSt, cloudSt) {
-            const loc = ensureStateIntegrity(localSt);
-            const cld = ensureStateIntegrity(cloudSt);
+        function loadLocalState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(BACKUP_SNAPSHOT_KEY);
+                if (raw) {
+                    appState = ensureStateIntegrity(JSON.parse(raw));
+                    return;
+                }
+            } catch (e) {}
+            appState = createDefaultState();
+            persistToLocalSafe();
+        }
 
-            const locIsDummy = isPureDefaultDummyState(loc);
-            const cldIsDummy = isPureDefaultDummyState(cld);
+        function persistToLocalSafe() {
+            if (!appState) return;
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            } catch (e) {
+                // Jika kuota localStorage penuh karena logo besar, simpan salinan data utama tanpa logo
+                try {
+                    const slimState = Object.assign({}, appState, { schoolLogo: '' });
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(slimState));
+                } catch (err) {}
+            }
+            try {
+                const safeSnapshot = Object.assign({}, appState, { schoolLogo: '' });
+                localStorage.setItem(BACKUP_SNAPSHOT_KEY, JSON.stringify(safeSnapshot));
+            } catch (e) {}
+        }
 
-            if (locIsDummy && !cldIsDummy) return cld;
-            if (!locIsDummy && cldIsDummy) return loc;
+        function mergeLocalAndCloudStates(localRaw, cloudRaw) {
+            const localSt = ensureStateIntegrity(localRaw);
+            const cloudSt = ensureStateIntegrity(cloudRaw);
 
-            const merged = ensureStateIntegrity((Number(cld.updatedAt) || 0) >= (Number(loc.updatedAt) || 0) ? cld : loc);
+            if (isPureDefaultDummyState(localSt) && !isPureDefaultDummyState(cloudSt)) {
+                return cloudSt;
+            }
+            if (!isPureDefaultDummyState(localSt) && isPureDefaultDummyState(cloudSt)) {
+                return localSt;
+            }
 
-            // Gabungkan Tahun Ajaran
-            const aySet = new Set([...(cld.academicYears || []), ...(loc.academicYears || [])]);
+            const merged = ensureStateIntegrity(Object.assign({}, cloudSt));
+            merged.updatedAt = Math.max(Number(localSt.updatedAt) || 0, Number(cloudSt.updatedAt) || 0);
+            merged.schoolLogo = localSt.schoolLogo || cloudSt.schoolLogo || '';
+
+            const aySet = new Set([...(cloudSt.academicYears || []), ...(localSt.academicYears || [])]);
             merged.academicYears = Array.from(aySet);
+            merged.activeAcademicYear = localSt.activeAcademicYear || cloudSt.activeAcademicYear || merged.academicYears[0];
 
-            // Gabungkan Siswa berdasarkan ID / NIS agar tidak ada yang terhapus
-            const studentMap = new Map();
-            (cld.students || []).forEach(s => studentMap.set(s.id || s.nis, s));
-            (loc.students || []).forEach(s => {
-                const key = s.id || s.nis;
-                if (!studentMap.has(key) || (Number(loc.updatedAt) || 0) > (Number(cld.updatedAt) || 0)) {
-                    studentMap.set(key, s);
+            // Gabungkan Users berdasarkan username
+            const userMap = new Map();
+            (cloudSt.users || []).forEach(u => userMap.set(u.username.toLowerCase(), u));
+            (localSt.users || []).forEach(u => {
+                if (!userMap.has(u.username.toLowerCase()) || (Number(localSt.updatedAt) || 0) >= (Number(cloudSt.updatedAt) || 0)) {
+                    userMap.set(u.username.toLowerCase(), u);
                 }
             });
-            merged.students = Array.from(studentMap.values());
+            merged.users = Array.from(userMap.values());
 
-            // Gabungkan seluruh transaksi Ledger per Tahun Ajaran -> Siswa -> Bulan
+            // Gabungkan Siswa berdasarkan id / nis
+            const stdMap = new Map();
+            (cloudSt.students || []).forEach(s => stdMap.set(s.id, s));
+            (localSt.students || []).forEach(s => {
+                if (!stdMap.has(s.id) || (Number(localSt.updatedAt) || 0) >= (Number(cloudSt.updatedAt) || 0)) {
+                    stdMap.set(s.id, s);
+                }
+            });
+            merged.students = Array.from(stdMap.values());
+
+            // Gabungkan Transaksi Ledger per Tahun Ajaran -> Siswa -> Bulan
             merged.ledger = {};
             merged.academicYears.forEach(ay => {
                 merged.ledger[ay] = {};
-                const cAy = (cld.ledger && cld.ledger[ay]) || {};
-                const lAy = (loc.ledger && loc.ledger[ay]) || {};
-                const allStdIds = new Set([...Object.keys(cAy), ...Object.keys(lAy)]);
-
-                allStdIds.forEach(stdId => {
-                    merged.ledger[ay][stdId] = {};
-                    const cMonths = cAy[stdId] || {};
-                    const lMonths = lAy[stdId] || {};
-                    const allMonths = new Set([...Object.keys(cMonths), ...Object.keys(lMonths)]);
-
-                    allMonths.forEach(mKey => {
+                const cAy = (cloudSt.ledger && cloudSt.ledger[ay]) || {};
+                const lAy = (localSt.ledger && localSt.ledger[ay]) || {};
+                const stdIds = new Set([...Object.keys(cAy), ...Object.keys(lAy)]);
+                stdIds.forEach(sId => {
+                    merged.ledger[ay][sId] = {};
+                    const cMonths = cAy[sId] || {};
+                    const lMonths = lAy[sId] || {};
+                    const mKeys = new Set([...Object.keys(cMonths), ...Object.keys(lMonths)]);
+                    mKeys.forEach(mKey => {
                         const cRec = cMonths[mKey];
                         const lRec = lMonths[mKey];
-                        if (cRec && !lRec) {
-                            merged.ledger[ay][stdId][mKey] = cRec;
-                        } else if (lRec && !cRec) {
-                            merged.ledger[ay][stdId][mKey] = lRec;
-                        } else if (cRec && lRec) {
-                            const cUpd = Number(cRec.updatedAt) || 0;
-                            const lUpd = Number(lRec.updatedAt) || 0;
-                            merged.ledger[ay][stdId][mKey] = lUpd >= cUpd ? lRec : cRec;
+                        if (!cRec) merged.ledger[ay][sId][mKey] = lRec;
+                        else if (!lRec) merged.ledger[ay][sId][mKey] = cRec;
+                        else {
+                            merged.ledger[ay][sId][mKey] = (Number(lRec.updatedAt) || 0) >= (Number(cRec.updatedAt) || 0) ? lRec : cRec;
                         }
                     });
                 });
             });
 
             // Gabungkan Wali Kelas & Pejabat
-            merged.homeroomTeachers = Object.assign({}, cld.homeroomTeachers || {}, loc.homeroomTeachers || {});
-            const staffMap = new Map();
-            (cld.officialStaff || []).forEach(st => staffMap.set(st.id, st));
-            (loc.officialStaff || []).forEach(st => staffMap.set(st.id, st));
-            merged.officialStaff = Array.from(staffMap.values());
-
-            // Gabungkan Akun Pengguna
-            const userMap = new Map();
-            (cld.users || []).forEach(u => userMap.set(u.username.toLowerCase(), u));
-            (loc.users || []).forEach(u => {
-                if (!userMap.has(u.username.toLowerCase()) || (Number(loc.updatedAt) || 0) >= (Number(cld.updatedAt) || 0)) {
-                    userMap.set(u.username.toLowerCase(), u);
+            merged.homeroomTeachers = Object.assign({}, cloudSt.homeroomTeachers || {});
+            Object.entries(localSt.homeroomTeachers || {}).forEach(([cls, info]) => {
+                if (!merged.homeroomTeachers[cls] || info.name || info.nip) {
+                    merged.homeroomTeachers[cls] = info;
                 }
             });
-            merged.users = Array.from(userMap.values());
 
-            if (!merged.schoolLogo) {
-                merged.schoolLogo = loc.schoolLogo || cld.schoolLogo || '';
-            }
+            const staffMap = new Map();
+            (cloudSt.officialStaff || []).forEach(st => staffMap.set(st.id, st));
+            (localSt.officialStaff || []).forEach(st => staffMap.set(st.id, st));
+            merged.officialStaff = Array.from(staffMap.values());
 
             return merged;
         }
 
-        function loadLocalState() {
-            const candidateKeys = [
-                STORAGE_KEY,
-                BACKUP_SNAPSHOT_KEY,
-                'smpn1_tempuran_tabungan_sumbangan_v2',
-                'smpn1_tempuran_tabungan_sumbangan_v1'
-            ];
-            let bestState = null;
-
-            for (const key of candidateKeys) {
-                try {
-                    const raw = localStorage.getItem(key);
-                    if (!raw) continue;
-                    const parsed = ensureStateIntegrity(JSON.parse(raw));
-                    if (!bestState) {
-                        bestState = parsed;
-                    } else {
-                        bestState = mergeLocalAndCloudStates(bestState, parsed);
-                    }
-                } catch (e) {
-                    console.warn('Gagal membaca storage key:', key, e);
-                }
-            }
-
-            appState = bestState || createDefaultState();
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-            } catch (e) {}
-        }
-
-        function updateCloudStatusUI(status, text) {
-            const el = document.getElementById('cloud-sync-status');
-            if (!el) return;
-            if (status === 'online') {
-                el.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span><span class="text-emerald-300">${escapeHTML(text || 'Online • Tersinkronisasi')}</span>`;
-            } else if (status === 'syncing') {
-                el.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping"></span><span class="text-sky-300">${escapeHTML(text || 'Menyinkronkan...')}</span>`;
-            } else {
-                el.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span><span class="text-amber-300">${escapeHTML(text || 'Tersimpan Lokal (Menunggu Koneksi)')}</span>`;
-            }
-        }
-
-        function persistToLocalSafe() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-                // Simpan snapshot tanpa base64 gambar besar agar tidak pernah melebihi kuota 5MB browser
-                const liteCopy = Object.assign({}, appState, { schoolLogo: '' });
-                localStorage.setItem(BACKUP_SNAPSHOT_KEY, JSON.stringify(liteCopy));
-            } catch (e) {
-                // Jika logo terlalu besar sehingga localStorage penuh, kosongkan logo sementara agar transaksi tetap tersimpan
-                try {
-                    const fallbackCopy = Object.assign({}, appState, { schoolLogo: '' });
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackCopy));
-                    localStorage.setItem(BACKUP_SNAPSHOT_KEY, JSON.stringify(fallbackCopy));
-                } catch (err2) {
-                    console.error('Penyimpanan lokal penuh:', err2);
-                }
-            }
-        }
-
-        async function saveState(pushToCloud = true) {
-            appState.updatedAt = Date.now();
-            persistToLocalSafe();
-            if (pushToCloud) {
-                await pushStateToCloud();
-            }
-        }
-
         async function pushStateToCloud() {
-            if (isCloudSyncing) return;
+            if (!appState || isCloudSyncing) return;
             isCloudSyncing = true;
             updateCloudStatusUI('syncing', 'Menyimpan ke Cloud...');
             try {
-                // Jangan pernah menimpa cloud dengan data dummy kosong jika cloud sudah punya data nyata
-                const checkRes = await fetch(`${FIREBASE_RTDB_URL}?t=${Date.now()}`, { cache: 'no-store' });
-                if (checkRes.ok) {
-                    const existingCloud = await checkRes.json();
-                    if (existingCloud && typeof existingCloud === 'object' && !isPureDefaultDummyState(existingCloud)) {
-                        appState = mergeLocalAndCloudStates(appState, existingCloud);
-                        appState.updatedAt = Date.now();
-                        persistToLocalSafe();
-                    }
-                }
-
                 const res = await fetch(FIREBASE_RTDB_URL, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -1635,9 +1747,18 @@
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 updateCloudStatusUI('online', 'Online • Tersinkronisasi');
             } catch (err) {
-                updateCloudStatusUI('offline', 'Tersimpan Lokal (Cek Rules Firebase)');
+                updateCloudStatusUI('offline', 'Tersimpan Lokal (Offline Cloud)');
             } finally {
                 isCloudSyncing = false;
+            }
+        }
+
+        function saveState(syncCloud = true) {
+            if (!appState) return;
+            appState.updatedAt = Date.now();
+            persistToLocalSafe();
+            if (syncCloud) {
+                pushStateToCloud();
             }
         }
 
@@ -1649,20 +1770,18 @@
                 const cloudData = await res.json();
 
                 if (cloudData && typeof cloudData === 'object') {
-                    const beforeTx = countRealTransactions(appState);
                     const merged = mergeLocalAndCloudStates(appState, cloudData);
                     appState = merged;
                     persistToLocalSafe();
-                    refreshAllUI();
+                    applySchoolLogos();
+                    if (currentUser) refreshAllUI();
 
-                    // Jika data lokal punya transaksi baru yang belum masuk ke cloud, dorong ke cloud sekarang
                     if (countRealTransactions(merged) > countRealTransactions(cloudData) || (Number(merged.updatedAt) || 0) > (Number(cloudData.updatedAt) || 0)) {
                         await pushStateToCloud();
                     } else {
                         updateCloudStatusUI('online', 'Online • Tersinkronisasi');
                     }
                 } else if (initialBoot && !isPureDefaultDummyState(appState)) {
-                    // Cloud kosong tetapi perangkat ini punya data nyata -> unggah ke cloud
                     await pushStateToCloud();
                 } else {
                     updateCloudStatusUI('online', 'Online • Siap Sinkron');
@@ -1671,4 +1790,1954 @@
                 updateCloudStatusUI('offline', 'Tersimpan Lokal (Offline Cloud)');
             }
         }
-// ... existing code ... -->
+
+        // =====================================================================
+        // OTENTIKASI LOGIN, SESI & HAK AKSES PENGGUNA
+        // =====================================================================
+        function fillDemoCredentials(u, p) {
+            document.getElementById('login-username').value = u;
+            document.getElementById('login-password').value = p;
+            document.getElementById('login-error-box').classList.add('hidden');
+        }
+
+        function toggleLoginPasswordVisibility() {
+            const inp = document.getElementById('login-password');
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+        }
+
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            if (!appState) loadLocalState();
+            const usernameInput = document.getElementById('login-username').value.trim().toLowerCase();
+            const passwordInput = document.getElementById('login-password').value;
+            const errBox = document.getElementById('login-error-box');
+            const errText = document.getElementById('login-error-text');
+
+            const matched = (appState.users || []).find(
+                u => u.username.trim().toLowerCase() === usernameInput && u.password === passwordInput
+            );
+
+            if (!matched) {
+                errText.textContent = 'Username atau kata sandi tidak sesuai.';
+                errBox.classList.remove('hidden');
+                return;
+            }
+            if (matched.active === false) {
+                errText.textContent = 'Akun ini sedang dinonaktifkan oleh Admin.';
+                errBox.classList.remove('hidden');
+                return;
+            }
+
+            errBox.classList.add('hidden');
+            currentUser = matched;
+            try {
+                localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: matched.id, username: matched.username }));
+            } catch (err) {}
+
+            enterAuthenticatedApp();
+            showToast(`Selamat datang, ${matched.fullname}!`);
+        }
+
+        function enterAuthenticatedApp() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-shell').classList.remove('hidden');
+
+            const isAdmin = currentUser && currentUser.role === 'ADMIN';
+            document.querySelectorAll('.admin-only').forEach(el => {
+                if (isAdmin) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+
+            document.getElementById('sidebar-user-fullname').textContent = currentUser.fullname;
+            document.getElementById('sidebar-user-username').textContent = '@' + currentUser.username;
+            document.getElementById('sidebar-role-badge').textContent = isAdmin ? 'Administrator Penuh' : 'Petugas Input';
+            document.getElementById('mobile-user-badge').textContent = isAdmin ? 'Admin' : 'Petugas Input';
+
+            applySchoolLogos();
+            refreshAllUI();
+            switchTab('ledger');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+            document.getElementById('app-shell').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('login-password').value = '';
+            applySchoolLogos();
+        }
+
+        function toggleMobileSidebar() {
+            const sb = document.getElementById('app-sidebar');
+            const bd = document.getElementById('sidebar-backdrop');
+            sb.classList.toggle('-translate-x-full');
+            bd.classList.toggle('hidden');
+        }
+
+        function switchTab(tabName) {
+            if (currentUser && currentUser.role !== 'ADMIN' && ['students', 'homeroom', 'users', 'backup'].includes(tabName)) {
+                showToast('Menu ini hanya dapat diakses oleh Administrator.', 'error');
+                return;
+            }
+            activeTab = tabName;
+            document.querySelectorAll('.tab-section').forEach(sec => sec.classList.add('hidden'));
+            const target = document.getElementById('tab-' + tabName);
+            if (target) target.classList.remove('hidden');
+
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                if (btn.dataset.tab === tabName) {
+                    btn.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+                    btn.classList.remove('text-slate-300', 'hover:bg-slate-800');
+                } else {
+                    btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm');
+                    btn.classList.add('text-slate-300', 'hover:bg-slate-800');
+                }
+            });
+
+            if (window.innerWidth < 1024) {
+                document.getElementById('app-sidebar').classList.add('-translate-x-full');
+                document.getElementById('sidebar-backdrop').classList.add('hidden');
+            }
+
+            if (tabName === 'ledger') renderStudentLedger();
+            if (tabName === 'dashboard') renderDashboard();
+            if (tabName === 'history') renderHistoryTable();
+            if (tabName === 'recap') renderRecapSection();
+            if (tabName === 'reports') initOfficialReportControls();
+            if (tabName === 'students') renderMasterStudentsTable();
+            if (tabName === 'homeroom') { renderHomeroomTable(); renderOfficialStaffTable(); }
+            if (tabName === 'users') renderUsersManagementTable();
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // =====================================================================
+        // HELPER DATA, TAHUN AJARAN, & TRANSAKSI
+        // =====================================================================
+        function getAllClassNames() {
+            const set = new Set([...DEFAULT_CLASSES, ...Object.keys(appState.homeroomTeachers || {})]);
+            (appState.students || []).forEach(s => { if (s.className) set.add(s.className); });
+            return Array.from(set).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+        }
+
+        function getActiveYearLedger() {
+            const ay = appState.activeAcademicYear;
+            if (!appState.ledger[ay]) appState.ledger[ay] = {};
+            return appState.ledger[ay];
+        }
+
+        function getStudentMonthRecord(studentId, monthKey) {
+            const ayLedger = getActiveYearLedger();
+            if (!ayLedger[studentId]) return null;
+            return ayLedger[studentId][monthKey] || null;
+        }
+
+        function populateAllClassDropdowns() {
+            const classes = getAllClassNames();
+            const filterIds = ['ledger-class-filter', 'history-class-filter', 'master-student-class-filter'];
+            filterIds.forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const prev = sel.value;
+                sel.innerHTML = `<option value="ALL">Semua Kelas</option>` +
+                    classes.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+                if (prev && (prev === 'ALL' || classes.includes(prev))) sel.value = prev;
+            });
+
+            ['report-class-select', 'student-form-class'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const prev = sel.value;
+                sel.innerHTML = classes.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+                if (prev && classes.includes(prev)) sel.value = prev;
+            });
+        }
+
+        function populateAcademicYearDropdown() {
+            const sel = document.getElementById('academic-year-select');
+            if (!sel) return;
+            sel.innerHTML = (appState.academicYears || []).map(ay =>
+                `<option value="${escapeHTML(ay)}" ${ay === appState.activeAcademicYear ? 'selected' : ''}>TA ${escapeHTML(ay)}</option>`
+            ).join('');
+        }
+
+        function changeAcademicYear(newAy) {
+            appState.activeAcademicYear = newAy;
+            saveState(true);
+            refreshAllUI();
+            showToast(`Tahun Ajaran aktif: ${newAy}`);
+        }
+
+        function openAddAcademicYearModal() {
+            document.getElementById('new-ay-input').value = '';
+            document.getElementById('add-ay-modal').classList.remove('hidden');
+        }
+
+        function closeAddAcademicYearModal() {
+            document.getElementById('add-ay-modal').classList.add('hidden');
+        }
+
+        function handleAddAcademicYear(e) {
+            e.preventDefault();
+            const val = document.getElementById('new-ay-input').value.trim();
+            if (!val) return;
+            if (!appState.academicYears.includes(val)) {
+                appState.academicYears.push(val);
+            }
+            appState.activeAcademicYear = val;
+            if (!appState.ledger[val]) appState.ledger[val] = {};
+            saveState(true);
+            closeAddAcademicYearModal();
+            refreshAllUI();
+            showToast(`Tahun Ajaran ${val} ditambahkan.`);
+        }
+
+        function refreshAllUI() {
+            applySchoolLogos();
+            populateAcademicYearDropdown();
+            populateAllClassDropdowns();
+            populateHistoryMonthFilter();
+            populateRecapCalendarDropdowns();
+
+            if (!selectedStudentId || !(appState.students || []).some(s => s.id === selectedStudentId)) {
+                selectedStudentId = appState.students && appState.students.length > 0 ? appState.students[0].id : null;
+            }
+
+            if (activeTab === 'ledger') renderStudentLedger();
+            if (activeTab === 'dashboard') renderDashboard();
+            if (activeTab === 'history') renderHistoryTable();
+            if (activeTab === 'recap') renderRecapSection();
+            if (activeTab === 'reports') renderOfficialReportPreview();
+            if (activeTab === 'students') renderMasterStudentsTable();
+            if (activeTab === 'homeroom') { renderHomeroomTable(); renderOfficialStaffTable(); }
+            if (activeTab === 'users') renderUsersManagementTable();
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // =====================================================================
+        // BUKU KAS SISWA (LEDGER 12 BULAN) & DRAWER SETORAN
+        // =====================================================================
+        function onLedgerClassFilterChange() {
+            renderStudentSelectorOptions();
+            renderStudentLedger();
+        }
+
+        function onLedgerStudentSearch() {
+            renderStudentSelectorOptions();
+            renderStudentLedger();
+        }
+
+        function renderStudentSelectorOptions() {
+            const classVal = document.getElementById('ledger-class-filter').value;
+            const q = document.getElementById('ledger-student-search').value.trim().toLowerCase();
+            const filtered = (appState.students || []).filter(s => {
+                const matchClass = classVal === 'ALL' || s.className === classVal;
+                const matchQ = !q || s.name.toLowerCase().includes(q) || String(s.nis).toLowerCase().includes(q);
+                return matchClass && matchQ;
+            });
+
+            const sel = document.getElementById('ledger-student-select');
+            if (filtered.length === 0) {
+                sel.innerHTML = `<option value="">-- Tidak ada siswa cocok --</option>`;
+                selectedStudentId = null;
+                return;
+            }
+
+            sel.innerHTML = filtered.map(s =>
+                `<option value="${escapeHTML(s.id)}">${escapeHTML(s.name)} (${escapeHTML(s.className)} - NIS ${escapeHTML(s.nis)})</option>`
+            ).join('');
+
+            if (!filtered.some(s => s.id === selectedStudentId)) {
+                selectedStudentId = filtered[0].id;
+            }
+            sel.value = selectedStudentId;
+        }
+
+        function selectStudentById(id) {
+            selectedStudentId = id || null;
+            renderStudentLedger();
+        }
+
+        function setLedgerStatusFilter(st) {
+            ledgerStatusFilter = st;
+            document.querySelectorAll('.status-filter-btn').forEach(btn => {
+                if (btn.dataset.statusFilter === st) {
+                    btn.classList.add('bg-white', 'text-slate-900', 'shadow-2xs');
+                    btn.classList.remove('text-slate-600');
+                } else {
+                    btn.classList.remove('bg-white', 'text-slate-900', 'shadow-2xs');
+                    btn.classList.add('text-slate-600');
+                }
+            });
+            renderStudentLedger();
+        }
+
+        function renderStudentLedger() {
+            renderStudentSelectorOptions();
+            const student = (appState.students || []).find(s => s.id === selectedStudentId);
+            const tbody = document.getElementById('ledger-table-body');
+            const isAdmin = currentUser && currentUser.role === 'ADMIN';
+
+            document.getElementById('banner-academic-year').textContent = 'TA ' + appState.activeAcademicYear;
+
+            if (!student) {
+                document.getElementById('banner-student-name').textContent = 'Belum ada siswa dipilih';
+                document.getElementById('banner-student-meta').textContent = 'NIS: - • Kelas: -';
+                document.getElementById('banner-total-tabungan').textContent = 'Rp 0';
+                document.getElementById('banner-total-sumbangan').textContent = 'Rp 0';
+                document.getElementById('banner-total-combined').textContent = 'Rp 0';
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-400 font-medium">Silakan pilih atau tambahkan siswa terlebih dahulu.</td></tr>`;
+                return;
+            }
+
+            document.getElementById('banner-student-name').textContent = student.name;
+            document.getElementById('banner-student-meta').textContent = `NIS: ${student.nis} • ${student.className}`;
+
+            let sumTab = 0, countTab = 0, sumSum = 0, countSum = 0;
+            const rowsHTML = [];
+
+            MONTHS_LIST.forEach((m, idx) => {
+                const rec = getStudentMonthRecord(student.id, m.key);
+                const tAmt = Number(rec?.tabungan?.amount) || 0;
+                const sAmt = Number(rec?.sumbangan?.amount) || 0;
+                const totalMonth = tAmt + sAmt;
+                const isPaid = totalMonth > 0;
+
+                if (tAmt > 0) { sumTab += tAmt; countTab++; }
+                if (sAmt > 0) { sumSum += sAmt; countSum++; }
+
+                if (ledgerStatusFilter === 'PAID' && !isPaid) return;
+                if (ledgerStatusFilter === 'UNPAID' && isPaid) return;
+
+                const tDate = rec?.tabungan?.date ? formatShortDate(rec.tabungan.date) : '';
+                const sDate = rec?.sumbangan?.date ? formatShortDate(rec.sumbangan.date) : '';
+                const dateDisplay = isPaid ? (tDate || sDate || '-') : '-';
+
+                const officerObj = rec?.tabungan?.ttdValue ? rec.tabungan : (rec?.sumbangan || null);
+                let officerDisplay = '<span class="text-slate-400">Belum disahkan</span>';
+                if (officerObj && officerObj.ttdValue) {
+                    if (officerObj.ttdType === 'draw' && officerObj.ttdValue.startsWith('data:image')) {
+                        officerDisplay = `<img src="${officerObj.ttdValue}" alt="TTD" class="h-7 object-contain">`;
+                    } else {
+                        officerDisplay = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[11px]">✓ ${escapeHTML(officerObj.ttdValue)}</span>`;
+                    }
+                }
+
+                const canEdit = isAdmin || !isPaid;
+                const actionBtn = canEdit
+                    ? `<button type="button" onclick="openTransactionDrawer('${escapeHTML(student.id)}', '${m.key}')"
+                        class="px-3 py-1.5 rounded-lg ${isPaid ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} text-[11px] font-bold transition">
+                        ${isPaid ? 'Edit Setoran' : '+ Input Setoran'}
+                       </button>`
+                    : `<span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 text-[11px] font-bold">Terkunci</span>`;
+
+                const receiptBtn = isPaid
+                    ? `<button type="button" onclick="printSingleReceipt('${escapeHTML(student.id)}', '${m.key}')"
+                        class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition inline-flex items-center gap-1">
+                        <i data-lucide="printer" class="w-3 h-3"></i> Bukti
+                       </button>`
+                    : '';
+
+                rowsHTML.push(`
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-4 font-bold text-slate-500">${idx + 1}</td>
+                        <td class="py-3 px-4 font-extrabold text-slate-900">${m.label}</td>
+                        <td class="py-3 px-4 text-right font-bold ${tAmt > 0 ? 'text-emerald-700' : 'text-slate-400'}">${formatRupiah(tAmt)}</td>
+                        <td class="py-3 px-4 text-right font-bold ${sAmt > 0 ? 'text-sky-700' : 'text-slate-400'}">${formatRupiah(sAmt)}</td>
+                        <td class="py-3 px-4 text-right font-extrabold text-slate-900">${formatRupiah(totalMonth)}</td>
+                        <td class="py-3 px-4 text-slate-600 font-medium">${dateDisplay}</td>
+                        <td class="py-3 px-4">${officerDisplay}</td>
+                        <td class="py-3 px-4 text-center">
+                            <div class="inline-flex items-center gap-1.5">${actionBtn}${receiptBtn}</div>
+                        </td>
+                    </tr>
+                `);
+            });
+
+            document.getElementById('banner-total-tabungan').textContent = formatRupiah(sumTab);
+            document.getElementById('banner-count-tabungan').textContent = `${countTab} bulan setor`;
+            document.getElementById('banner-total-sumbangan').textContent = formatRupiah(sumSum);
+            document.getElementById('banner-count-sumbangan').textContent = `${countSum} bulan setor`;
+            document.getElementById('banner-total-combined').textContent = formatRupiah(sumTab + sumSum);
+
+            tbody.innerHTML = rowsHTML.length > 0
+                ? rowsHTML.join('')
+                : `<tr><td colspan="8" class="py-8 text-center text-slate-400 font-medium">Tidak ada baris bulan untuk filter status ini.</td></tr>`;
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // =====================================================================
+        // LACI INPUT SETORAN & TANDA TANGAN
+        // =====================================================================
+        function openTransactionDrawer(studentId, monthKey) {
+            const student = (appState.students || []).find(s => s.id === studentId);
+            const monthObj = MONTHS_LIST.find(m => m.key === monthKey);
+            if (!student || !monthObj) return;
+
+            const rec = getStudentMonthRecord(studentId, monthKey);
+            const isPaid = (Number(rec?.tabungan?.amount) || 0) + (Number(rec?.sumbangan?.amount) || 0) > 0;
+            if (isPaid && currentUser && currentUser.role !== 'ADMIN') {
+                showToast('Setoran yang sudah tersimpan hanya dapat diubah oleh Admin.', 'error');
+                return;
+            }
+
+            drawerContext = { studentId, monthKey, signatureMode: 'stamp' };
+            document.getElementById('drawer-month-badge').textContent = `Bulan ${monthObj.label} • TA ${appState.activeAcademicYear}`;
+            document.getElementById('drawer-student-title').textContent = `${student.name} (${student.className})`;
+
+            document.getElementById('drawer-tabungan-amount').value = rec?.tabungan?.amount || '';
+            document.getElementById('drawer-tabungan-date').value = normalizedDateISO(rec?.tabungan?.date) || getTodayISO();
+            document.getElementById('drawer-sumbangan-amount').value = rec?.sumbangan?.amount || '';
+            document.getElementById('drawer-sumbangan-date').value = normalizedDateISO(rec?.sumbangan?.date) || getTodayISO();
+
+            const defaultOfficer = (rec?.tabungan?.ttdType === 'stamp' && rec.tabungan.ttdValue)
+                ? rec.tabungan.ttdValue
+                : (currentUser ? currentUser.fullname : 'Petugas TU');
+            document.getElementById('drawer-officer-name').value = defaultOfficer;
+
+            setDrawerSignatureMode('stamp');
+            clearDrawerSignatureCanvas();
+
+            const printBtn = document.getElementById('drawer-print-receipt-btn');
+            const delBtn = document.getElementById('drawer-delete-tx-btn');
+            if (isPaid) {
+                printBtn.classList.remove('hidden');
+                if (currentUser && currentUser.role === 'ADMIN') delBtn.classList.remove('hidden');
+            } else {
+                printBtn.classList.add('hidden');
+                delBtn.classList.add('hidden');
+            }
+
+            document.getElementById('transaction-drawer-backdrop').classList.remove('hidden');
+            document.getElementById('transaction-drawer').classList.remove('translate-x-full');
+        }
+
+        function closeTransactionDrawer() {
+            document.getElementById('transaction-drawer').classList.add('translate-x-full');
+            document.getElementById('transaction-drawer-backdrop').classList.add('hidden');
+        }
+
+        function setDrawerSignatureMode(mode) {
+            drawerContext.signatureMode = mode;
+            const btnStamp = document.getElementById('btn-ttd-stamp');
+            const btnDraw = document.getElementById('btn-ttd-draw');
+            const boxStamp = document.getElementById('drawer-stamp-box');
+            const boxDraw = document.getElementById('drawer-draw-box');
+
+            if (mode === 'draw') {
+                btnDraw.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-indigo-600 text-white';
+                btnStamp.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700';
+                boxStamp.classList.add('hidden');
+                boxDraw.classList.remove('hidden');
+            } else {
+                btnStamp.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-indigo-600 text-white';
+                btnDraw.className = 'flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700';
+                boxDraw.classList.add('hidden');
+                boxStamp.classList.remove('hidden');
+            }
+        }
+
+        function initSignaturePad() {
+            const canvas = document.getElementById('drawer-signature-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.lineWidth = 2.2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#0f172a';
+
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: (clientX - rect.left) * (canvas.width / rect.width),
+                    y: (clientY - rect.top) * (canvas.height / rect.height)
+                };
+            };
+
+            const start = (e) => {
+                isDrawingSignature = true;
+                const p = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+            };
+            const move = (e) => {
+                if (!isDrawingSignature) return;
+                e.preventDefault();
+                const p = getPos(e);
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+            };
+            const end = () => { isDrawingSignature = false; };
+
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', end);
+            canvas.addEventListener('touchstart', start, { passive: false });
+            canvas.addEventListener('touchmove', move, { passive: false });
+            window.addEventListener('touchend', end);
+        }
+
+        function clearDrawerSignatureCanvas() {
+            const canvas = document.getElementById('drawer-signature-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function saveDrawerTransaction(printAfterSave = false) {
+            const { studentId, monthKey, signatureMode } = drawerContext;
+            if (!studentId || !monthKey) return;
+
+            const tabAmount = Number(document.getElementById('drawer-tabungan-amount').value) || 0;
+            const tabDate = normalizedDateISO(document.getElementById('drawer-tabungan-date').value) || getTodayISO();
+            const sumAmount = Number(document.getElementById('drawer-sumbangan-amount').value) || 0;
+            const sumDate = normalizedDateISO(document.getElementById('drawer-sumbangan-date').value) || getTodayISO();
+
+            if (tabAmount <= 0 && sumAmount <= 0) {
+                showToast('Masukkan minimal nominal Tabungan atau Sumbangan Sukarela.', 'error');
+                return;
+            }
+
+            let ttdType = 'stamp';
+            let ttdValue = document.getElementById('drawer-officer-name').value.trim() || (currentUser ? currentUser.fullname : 'Petugas TU');
+            if (signatureMode === 'draw') {
+                const canvas = document.getElementById('drawer-signature-canvas');
+                ttdType = 'draw';
+                ttdValue = canvas.toDataURL('image/png');
+            }
+
+            const ayLedger = getActiveYearLedger();
+            if (!ayLedger[studentId]) ayLedger[studentId] = {};
+            ayLedger[studentId][monthKey] = {
+                tabungan: tabAmount > 0 ? { amount: tabAmount, date: tabDate, ttdType, ttdValue } : null,
+                sumbangan: sumAmount > 0 ? { amount: sumAmount, date: sumDate, ttdType, ttdValue } : null,
+                updatedAt: Date.now()
+            };
+
+            const chosenDate = (tabAmount > 0 ? tabDate : sumDate) || getTodayISO();
+            const dParts = chosenDate.split('-');
+            if (dParts.length === 3) {
+                recapCalYear = parseInt(dParts[0], 10);
+                recapCalMonth = parseInt(dParts[1], 10) - 1;
+                recapSelectedDateISO = chosenDate;
+            }
+
+            saveState(true);
+            closeTransactionDrawer();
+            renderStudentLedger();
+            showToast('Setoran siswa berhasil disimpan & disinkronkan.');
+
+            if (printAfterSave) {
+                printSingleReceipt(studentId, monthKey);
+            }
+        }
+
+        function printCurrentDrawerReceipt() {
+            if (drawerContext.studentId && drawerContext.monthKey) {
+                printSingleReceipt(drawerContext.studentId, drawerContext.monthKey);
+            }
+        }
+
+        function deleteCurrentDrawerTransaction() {
+            if (!currentUser || currentUser.role !== 'ADMIN') return;
+            const { studentId, monthKey } = drawerContext;
+            const ayLedger = getActiveYearLedger();
+            if (ayLedger[studentId] && ayLedger[studentId][monthKey]) {
+                delete ayLedger[studentId][monthKey];
+                saveState(true);
+                closeTransactionDrawer();
+                renderStudentLedger();
+                showToast('Transaksi bulan terpilih telah dihapus.');
+            }
+        }
+
+        // =====================================================================
+        // RIWAYAT TRANSAKSI & DATA TRANSAKSI TERFLAT
+        // =====================================================================
+        function getAllFlattenedTransactions(filterObj = null) {
+            const ayLedger = getActiveYearLedger();
+            const list = [];
+            (appState.students || []).forEach(student => {
+                const stdMonths = ayLedger[student.id] || {};
+                MONTHS_LIST.forEach(m => {
+                    const rec = stdMonths[m.key];
+                    if (!rec) return;
+                    const tabAmount = Number(rec.tabungan?.amount) || 0;
+                    const sumAmount = Number(rec.sumbangan?.amount) || 0;
+                    if (tabAmount <= 0 && sumAmount <= 0) return;
+
+                    const tabDate = rec.tabungan?.date ? normalizedDateISO(rec.tabungan.date) : '';
+                    const sumDate = rec.sumbangan?.date ? normalizedDateISO(rec.sumbangan.date) : '';
+                    const primaryDate = tabDate || sumDate || '';
+                    const ttdObj = (rec.tabungan && rec.tabungan.ttdValue) ? rec.tabungan : (rec.sumbangan || null);
+
+                    list.push({
+                        studentId: student.id,
+                        nis: student.nis,
+                        studentName: student.name,
+                        className: student.className,
+                        monthKey: m.key,
+                        monthLabel: m.label,
+                        tabungan: tabAmount,
+                        tabunganDate: tabDate,
+                        sumbangan: sumAmount,
+                        sumbanganDate: sumDate,
+                        total: tabAmount + sumAmount,
+                        primaryDate,
+                        officerName: ttdObj?.ttdType === 'stamp' ? ttdObj.ttdValue : 'Tanda Tangan Digital',
+                        updatedAt: Number(rec.updatedAt) || 0
+                    });
+                });
+            });
+
+            list.sort((a, b) => {
+                if (b.primaryDate !== a.primaryDate) return b.primaryDate.localeCompare(a.primaryDate);
+                return b.updatedAt - a.updatedAt;
+            });
+
+            if (!filterObj) return list;
+            return list.filter(tx => {
+                if (filterObj.className && filterObj.className !== 'ALL' && tx.className !== filterObj.className) return false;
+                if (filterObj.monthKey && filterObj.monthKey !== 'ALL' && tx.monthKey !== filterObj.monthKey) return false;
+                if (filterObj.type === 'TABUNGAN' && tx.tabungan <= 0) return false;
+                if (filterObj.type === 'SUMBANGAN' && tx.sumbangan <= 0) return false;
+                if (filterObj.q) {
+                    const q = filterObj.q.toLowerCase();
+                    const hit = tx.studentName.toLowerCase().includes(q) ||
+                        String(tx.nis).toLowerCase().includes(q) ||
+                        tx.officerName.toLowerCase().includes(q);
+                    if (!hit) return false;
+                }
+                return true;
+            });
+        }
+
+        function populateHistoryMonthFilter() {
+            const sel = document.getElementById('history-month-filter');
+            if (!sel) return;
+            const prev = sel.value;
+            sel.innerHTML = `<option value="ALL">Semua Bulan</option>` +
+                MONTHS_LIST.map(m => `<option value="${m.key}">${m.label}</option>`).join('');
+            if (prev) sel.value = prev;
+        }
+
+        function renderHistoryTable() {
+            const q = document.getElementById('history-search-input').value.trim();
+            const className = document.getElementById('history-class-filter').value;
+            const monthKey = document.getElementById('history-month-filter').value;
+            const type = document.getElementById('history-type-filter').value;
+
+            const rows = getAllFlattenedTransactions({ q, className, monthKey, type });
+            const tbody = document.getElementById('history-table-body');
+
+            if (rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-slate-400 font-medium">Belum ada transaksi yang sesuai filter.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.map(tx => `
+                <tr class="hover:bg-slate-50/80">
+                    <td class="py-3 px-4 font-semibold text-slate-700">${formatShortDate(tx.primaryDate)}</td>
+                    <td class="py-3 px-4">
+                        <div class="font-extrabold text-slate-900">${escapeHTML(tx.studentName)}</div>
+                        <div class="text-[11px] text-slate-500">NIS: ${escapeHTML(tx.nis)}</div>
+                    </td>
+                    <td class="py-3 px-4 font-bold text-indigo-700">${escapeHTML(tx.className)}</td>
+                    <td class="py-3 px-4 font-bold text-slate-800">${escapeHTML(tx.monthLabel)}</td>
+                    <td class="py-3 px-4 text-right font-bold text-emerald-700">${formatRupiah(tx.tabungan)}</td>
+                    <td class="py-3 px-4 text-right font-bold text-sky-700">${formatRupiah(tx.sumbangan)}</td>
+                    <td class="py-3 px-4 text-right font-extrabold text-slate-900">${formatRupiah(tx.total)}</td>
+                    <td class="py-3 px-4 text-slate-600">${escapeHTML(tx.officerName)}</td>
+                    <td class="py-3 px-4 text-center">
+                        <button type="button" onclick="printSingleReceipt('${escapeHTML(tx.studentId)}', '${escapeHTML(tx.monthKey)}')"
+                            class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold inline-flex items-center gap-1">
+                            <i data-lucide="printer" class="w-3 h-3"></i> Bukti
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // =====================================================================
+        // DASHBOARD KPI & GRAFIK BULANAN
+        // =====================================================================
+        function renderDashboard() {
+            document.getElementById('dash-ay-label').textContent = 'TA ' + appState.activeAcademicYear;
+            const allTx = getAllFlattenedTransactions(null);
+            let totalTab = 0, countTab = 0, totalSum = 0, countSum = 0;
+            const activeStdSet = new Set();
+
+            const monthTabTotals = new Array(12).fill(0);
+            const monthSumTotals = new Array(12).fill(0);
+
+            allTx.forEach(tx => {
+                if (tx.tabungan > 0) { totalTab += tx.tabungan; countTab++; activeStdSet.add(tx.studentId); }
+                if (tx.sumbangan > 0) { totalSum += tx.sumbangan; countSum++; activeStdSet.add(tx.studentId); }
+                const mIdx = MONTHS_LIST.findIndex(m => m.key === tx.monthKey);
+                if (mIdx >= 0) {
+                    monthTabTotals[mIdx] += tx.tabungan;
+                    monthSumTotals[mIdx] += tx.sumbangan;
+                }
+            });
+
+            document.getElementById('kpi-total-tabungan').textContent = formatRupiah(totalTab);
+            document.getElementById('kpi-sub-tabungan').textContent = `${countTab} transaksi tabungan`;
+            document.getElementById('kpi-total-sumbangan').textContent = formatRupiah(totalSum);
+            document.getElementById('kpi-sub-sumbangan').textContent = `${countSum} transaksi sumbangan`;
+            document.getElementById('kpi-total-grand').textContent = formatRupiah(totalTab + totalSum);
+            document.getElementById('kpi-total-students').textContent = `${(appState.students || []).length} Siswa`;
+            document.getElementById('kpi-active-students').textContent = `${activeStdSet.size} siswa aktif menabung`;
+
+            const recentBox = document.getElementById('dashboard-recent-list');
+            const recent = allTx.slice(0, 6);
+            recentBox.innerHTML = recent.length === 0
+                ? `<div class="py-8 text-center text-xs text-slate-400">Belum ada setoran tercatat pada tahun ajaran ini.</div>`
+                : recent.map(tx => `
+                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="text-xs font-extrabold text-slate-900 truncate">${escapeHTML(tx.studentName)}</div>
+                            <div class="text-[11px] text-slate-500">${escapeHTML(tx.className)} • ${escapeHTML(tx.monthLabel)} (${formatShortDate(tx.primaryDate)})</div>
+                        </div>
+                        <div class="text-xs font-extrabold text-indigo-700 shrink-0">${formatRupiah(tx.total)}</div>
+                    </div>
+                `).join('');
+
+            const ctx = document.getElementById('monthly-recap-chart');
+            if (ctx && window.Chart) {
+                if (monthlyChartInstance) monthlyChartInstance.destroy();
+                monthlyChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: MONTHS_LIST.map(m => m.label),
+                        datasets: [
+                            { label: 'Tabungan Siswa', data: monthTabTotals, backgroundColor: '#10b981', borderRadius: 6 },
+                            { label: 'Sumbangan Sukarela', data: monthSumTotals, backgroundColor: '#0284c7', borderRadius: 6 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom' } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+        }
+
+        // =====================================================================
+        // UPLOAD LOGO SEKOLAH (ADMIN)
+        // =====================================================================
+        function handleSchoolLogoUpload(event) {
+            if (!currentUser || currentUser.role !== 'ADMIN') return;
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const maxDim = 260;
+                    let w = img.width, h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                        else { w = Math.round(w * maxDim / h); h = maxDim; }
+                    }
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    appState.schoolLogo = canvas.toDataURL('image/png');
+                    saveState(true);
+                    applySchoolLogos();
+                    showToast('Logo resmi sekolah berhasil diperbarui & disinkronkan.');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetSchoolLogo() {
+            if (!currentUser || currentUser.role !== 'ADMIN') return;
+            appState.schoolLogo = '';
+            saveState(true);
+            applySchoolLogos();
+            showToast('Logo sekolah dikembalikan ke lambang bawaan.');
+        }
+
+        // =====================================================================
+        // REKAP KEUANGAN & KALENDER RINCIAN PER TANGGAL
+        // =====================================================================
+        function populateRecapCalendarDropdowns() {
+            const mSel = document.getElementById('recap-cal-month-select');
+            const ySel = document.getElementById('recap-cal-year-select');
+            if (!mSel || !ySel) return;
+
+            const calMonths = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            mSel.innerHTML = calMonths.map((name, idx) =>
+                `<option value="${idx}" ${idx === recapCalMonth ? 'selected' : ''}>${name}</option>`
+            ).join('');
+
+            const curY = new Date().getFullYear();
+            const years = [];
+            for (let y = curY - 2; y <= curY + 3; y++) years.push(y);
+            ySel.innerHTML = years.map(y =>
+                `<option value="${y}" ${y === recapCalYear ? 'selected' : ''}>${y}</option>`
+            ).join('');
+        }
+
+        function shiftRecapCalendarMonth(delta) {
+            recapCalMonth += delta;
+            if (recapCalMonth < 0) { recapCalMonth = 11; recapCalYear--; }
+            if (recapCalMonth > 11) { recapCalMonth = 0; recapCalYear++; }
+            populateRecapCalendarDropdowns();
+            renderRecapCalendar();
+        }
+
+        function onRecapCalendarDropdownChange() {
+            recapCalMonth = parseInt(document.getElementById('recap-cal-month-select').value, 10);
+            recapCalYear = parseInt(document.getElementById('recap-cal-year-select').value, 10);
+            renderRecapCalendar();
+        }
+
+        function onRecapDirectDateInput(isoDate) {
+            const norm = normalizedDateISO(isoDate);
+            if (!norm) return;
+            const parts = norm.split('-');
+            if (parts.length === 3) {
+                recapCalYear = parseInt(parts[0], 10);
+                recapCalMonth = parseInt(parts[1], 10) - 1;
+            }
+            recapSelectedDateISO = norm;
+            populateRecapCalendarDropdowns();
+            renderRecapCalendar();
+        }
+
+        function jumpToLatestTransactionDate() {
+            const allTx = getAllFlattenedTransactions(null);
+            const withDates = allTx.filter(tx => tx.primaryDate);
+            if (withDates.length === 0) {
+                showToast('Belum ada transaksi yang memiliki tanggal setor.', 'error');
+                return;
+            }
+            const latestDate = withDates[0].primaryDate;
+            onRecapDirectDateInput(latestDate);
+            showToast(`Menampilkan transaksi tanggal ${formatShortDate(latestDate)}.`);
+        }
+
+        function getDailyStudentTransactions(isoDate) {
+            const targetIso = normalizedDateISO(isoDate);
+            const allTx = getAllFlattenedTransactions(null);
+            const rows = [];
+            allTx.forEach(tx => {
+                const effTabDate = tx.tabunganDate || tx.sumbanganDate;
+                const effSumDate = tx.sumbanganDate || tx.tabunganDate;
+                const tabOnDate = (tx.tabungan > 0 && effTabDate === targetIso) ? tx.tabungan : 0;
+                const sumOnDate = (tx.sumbangan > 0 && effSumDate === targetIso) ? tx.sumbangan : 0;
+                if (tabOnDate > 0 || sumOnDate > 0) {
+                    rows.push(Object.assign({}, tx, {
+                        tabungan: tabOnDate,
+                        sumbangan: sumOnDate,
+                        total: tabOnDate + sumOnDate
+                    }));
+                }
+            });
+            return rows;
+        }
+
+        function renderRecapCalendar() {
+            const allTx = getAllFlattenedTransactions(null);
+            const dateTotalsMap = {};
+            allTx.forEach(tx => {
+                const d1 = tx.tabunganDate || tx.sumbanganDate;
+                const d2 = tx.sumbanganDate || tx.tabunganDate;
+                if (tx.tabungan > 0 && d1) {
+                    dateTotalsMap[d1] = (dateTotalsMap[d1] || 0) + tx.tabungan;
+                }
+                if (tx.sumbangan > 0 && d2) {
+                    dateTotalsMap[d2] = (dateTotalsMap[d2] || 0) + tx.sumbangan;
+                }
+            });
+
+            const monthPrefix = `${recapCalYear}-${String(recapCalMonth + 1).padStart(2, '0')}-`;
+            const activeDatesInMonth = Object.keys(dateTotalsMap).filter(d => d.startsWith(monthPrefix)).sort();
+
+            const pillsBox = document.getElementById('recap-active-dates-pills');
+            if (pillsBox) {
+                if (activeDatesInMonth.length > 0) {
+                    pillsBox.classList.remove('hidden');
+                    pillsBox.classList.add('flex');
+                    pillsBox.innerHTML = `<span class="text-[11px] font-bold text-slate-500 mr-1">Tanggal ada setoran:</span>` +
+                        activeDatesInMonth.map(d => {
+                            const dayNum = parseInt(d.split('-')[2], 10);
+                            const active = d === recapSelectedDateISO;
+                            return `<button type="button" onclick="onRecapDirectDateInput('${d}')"
+                                class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}">
+                                Tgl ${dayNum}
+                            </button>`;
+                        }).join('');
+                } else {
+                    pillsBox.classList.add('hidden');
+                    pillsBox.classList.remove('flex');
+                }
+            }
+
+            const firstDay = new Date(recapCalYear, recapCalMonth, 1).getDay();
+            const daysInMonth = new Date(recapCalYear, recapCalMonth + 1, 0).getDate();
+            const grid = document.getElementById('recap-calendar-grid');
+            const cells = [];
+
+            for (let i = 0; i < firstDay; i++) {
+                cells.push(`<div class="h-14 rounded-xl bg-slate-50/40"></div>`);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const iso = `${recapCalYear}-${String(recapCalMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const amt = dateTotalsMap[iso] || 0;
+                const isSelected = iso === recapSelectedDateISO;
+
+                let cls = 'border-slate-200/80 bg-white hover:border-indigo-400 text-slate-700';
+                if (amt > 0) cls = 'border-emerald-300 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-950';
+                if (isSelected) cls = 'border-indigo-600 bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-600/25';
+
+                cells.push(`
+                    <button type="button" onclick="onRecapDirectDateInput('${iso}')"
+                        class="h-14 p-1.5 rounded-xl border text-left flex flex-col justify-between transition ${cls}">
+                        <span class="text-xs font-extrabold">${day}</span>
+                        ${amt > 0 ? `<span class="text-[9px] font-bold truncate ${isSelected ? 'text-indigo-100' : 'text-emerald-700'}">${formatRupiah(amt)}</span>` : ''}
+                    </button>
+                `);
+            }
+            grid.innerHTML = cells.join('');
+
+            // Update panel rincian tanggal terpilih
+            document.getElementById('recap-direct-date-picker').value = recapSelectedDateISO;
+            document.getElementById('recap-selected-date-label').textContent = formatShortDate(recapSelectedDateISO);
+
+            const dailyRows = getDailyStudentTransactions(recapSelectedDateISO);
+            let dTab = 0, dSum = 0;
+            dailyRows.forEach(r => { dTab += r.tabungan; dSum += r.sumbangan; });
+
+            document.getElementById('recap-day-tabungan').textContent = formatRupiah(dTab);
+            document.getElementById('recap-day-sumbangan').textContent = formatRupiah(dSum);
+            document.getElementById('recap-day-total').textContent = formatRupiah(dTab + dSum);
+            document.getElementById('recap-daily-table-title').textContent = `Rincian Transaksi Tanggal ${formatShortDate(recapSelectedDateISO)}`;
+            document.getElementById('recap-daily-count-badge').textContent = `${dailyRows.length} Transaksi`;
+
+            const dailyTbody = document.getElementById('recap-daily-table-body');
+            if (dailyRows.length === 0) {
+                dailyTbody.innerHTML = `<tr><td colspan="9" class="py-6 text-center text-slate-400 font-medium">Tidak ada transaksi setoran pada tanggal ${formatShortDate(recapSelectedDateISO)}.</td></tr>`;
+            } else {
+                dailyTbody.innerHTML = dailyRows.map((r, i) => `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-3 px-4 font-bold text-slate-500">${i + 1}</td>
+                        <td class="py-3 px-4">
+                            <div class="font-extrabold text-slate-900">${escapeHTML(r.studentName)}</div>
+                            <div class="text-[11px] text-slate-500">NIS: ${escapeHTML(r.nis)}</div>
+                        </td>
+                        <td class="py-3 px-4 font-bold text-indigo-700">${escapeHTML(r.className)}</td>
+                        <td class="py-3 px-4 font-bold text-slate-700">${escapeHTML(r.monthLabel)}</td>
+                        <td class="py-3 px-4 text-right font-bold text-emerald-700">${formatRupiah(r.tabungan)}</td>
+                        <td class="py-3 px-4 text-right font-bold text-sky-700">${formatRupiah(r.sumbangan)}</td>
+                        <td class="py-3 px-4 text-right font-extrabold text-slate-900">${formatRupiah(r.total)}</td>
+                        <td class="py-3 px-4 text-slate-600">${escapeHTML(r.officerName)}</td>
+                        <td class="py-3 px-4 text-center">
+                            <button type="button" onclick="printSingleReceipt('${escapeHTML(r.studentId)}', '${escapeHTML(r.monthKey)}')"
+                                class="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-bold">Bukti</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        function renderRecapSection() {
+            const allTx = getAllFlattenedTransactions(null);
+            if (allTx.length > 0 && getDailyStudentTransactions(recapSelectedDateISO).length === 0) {
+                const latest = allTx.find(t => t.primaryDate);
+                if (latest) {
+                    const p = latest.primaryDate.split('-');
+                    recapCalYear = parseInt(p[0], 10);
+                    recapCalMonth = parseInt(p[1], 10) - 1;
+                    recapSelectedDateISO = latest.primaryDate;
+                    populateRecapCalendarDropdowns();
+                }
+            }
+            renderRecapCalendar();
+
+            // Rekap per kelas
+            const classes = getAllClassNames();
+            const classBody = document.getElementById('recap-class-table-body');
+            classBody.innerHTML = classes.map(cls => {
+                const stds = (appState.students || []).filter(s => s.className === cls);
+                let cTab = 0, cSum = 0;
+                allTx.filter(t => t.className === cls).forEach(t => { cTab += t.tabungan; cSum += t.sumbangan; });
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-2.5 px-4 font-extrabold text-slate-900">${escapeHTML(cls)}</td>
+                        <td class="py-2.5 px-4 text-center text-slate-600 font-bold">${stds.length}</td>
+                        <td class="py-2.5 px-4 text-right font-bold text-emerald-700">${formatRupiah(cTab)}</td>
+                        <td class="py-2.5 px-4 text-right font-bold text-sky-700">${formatRupiah(cSum)}</td>
+                        <td class="py-2.5 px-4 text-right font-extrabold text-slate-900">${formatRupiah(cTab + cSum)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Rekap per bulan
+            const monthBody = document.getElementById('recap-month-table-body');
+            monthBody.innerHTML = MONTHS_LIST.map(m => {
+                let mTab = 0, mSum = 0;
+                allTx.filter(t => t.monthKey === m.key).forEach(t => { mTab += t.tabungan; mSum += t.sumbangan; });
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-2.5 px-4 font-extrabold text-slate-900">${m.label}</td>
+                        <td class="py-2.5 px-4 text-right font-bold text-emerald-700">${formatRupiah(mTab)}</td>
+                        <td class="py-2.5 px-4 text-right font-bold text-sky-700">${formatRupiah(mSum)}</td>
+                        <td class="py-2.5 px-4 text-right font-extrabold text-slate-900">${formatRupiah(mTab + mSum)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // =====================================================================
+        // DATABASE WALI KELAS (7A-9G) & DATABASE PEJABAT / PETUGAS TU
+        // =====================================================================
+        function setHomeroomLevelFilter(lvl) {
+            homeroomLevelFilter = lvl;
+            document.querySelectorAll('.hr-level-btn').forEach(btn => {
+                if (btn.dataset.hrLevel === lvl) {
+                    btn.className = 'hr-level-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white';
+                } else {
+                    btn.className = 'hr-level-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700';
+                }
+            });
+            renderHomeroomTable();
+        }
+
+        function renderHomeroomTable() {
+            const tbody = document.getElementById('homeroom-table-body');
+            if (!tbody) return;
+            const q = (document.getElementById('homeroom-search-input')?.value || '').trim().toLowerCase();
+            const classes = getAllClassNames().filter(cls => {
+                if (homeroomLevelFilter !== 'ALL' && !cls.includes(homeroomLevelFilter)) return false;
+                const info = appState.homeroomTeachers[cls] || { name: '', nip: '' };
+                if (!q) return true;
+                return cls.toLowerCase().includes(q) || (info.name || '').toLowerCase().includes(q) || (info.nip || '').toLowerCase().includes(q);
+            });
+
+            tbody.innerHTML = classes.map((cls, idx) => {
+                const info = appState.homeroomTeachers[cls] || { name: '', nip: '' };
+                const safeId = cls.replace(/[^a-zA-Z0-9]/g, '_');
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-2.5 px-4 font-bold text-slate-500">${idx + 1}</td>
+                        <td class="py-2.5 px-4 font-extrabold text-indigo-700">${escapeHTML(cls)}</td>
+                        <td class="py-2.5 px-4">
+                            <input id="hr-name-${safeId}" type="text" value="${escapeHTML(info.name || '')}" placeholder="Nama Wali Kelas..."
+                                class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold">
+                        </td>
+                        <td class="py-2.5 px-4">
+                            <input id="hr-nip-${safeId}" type="text" value="${escapeHTML(info.nip || '')}" placeholder="NIP..."
+                                class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium">
+                        </td>
+                        <td class="py-2.5 px-4 text-center">
+                            <div class="inline-flex items-center gap-1">
+                                <button type="button" onclick="openHomeroomClassModal('${escapeHTML(cls)}')" title="Edit Nama Kelas"
+                                    class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                                <button type="button" onclick="saveSingleHomeroomRow('${escapeHTML(cls)}')" title="Simpan Baris"
+                                    class="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700"><i data-lucide="save" class="w-3.5 h-3.5"></i></button>
+                                <button type="button" onclick="deleteHomeroomClass('${escapeHTML(cls)}')" title="Hapus Kelas"
+                                    class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function saveSingleHomeroomRow(cls) {
+            const safeId = cls.replace(/[^a-zA-Z0-9]/g, '_');
+            const name = document.getElementById(`hr-name-${safeId}`)?.value.trim() || '';
+            const nip = document.getElementById(`hr-nip-${safeId}`)?.value.trim() || '';
+            appState.homeroomTeachers[cls] = { name, nip };
+            saveState(true);
+            showToast(`Wali kelas ${cls} berhasil disimpan.`);
+        }
+
+        function saveAllHomeroomTeachers() {
+            getAllClassNames().forEach(cls => {
+                const safeId = cls.replace(/[^a-zA-Z0-9]/g, '_');
+                const nEl = document.getElementById(`hr-name-${safeId}`);
+                const pEl = document.getElementById(`hr-nip-${safeId}`);
+                if (nEl && pEl) {
+                    appState.homeroomTeachers[cls] = { name: nEl.value.trim(), nip: pEl.value.trim() };
+                }
+            });
+            saveState(true);
+            showToast('Seluruh database wali kelas berhasil disimpan.');
+        }
+
+        function openHomeroomClassModal(existingClass = '') {
+            document.getElementById('homeroom-modal-old-class').value = existingClass;
+            document.getElementById('homeroom-modal-title').textContent = existingClass ? `Edit Kelas ${existingClass}` : 'Tambah Kelas & Wali Kelas Baru';
+            document.getElementById('homeroom-modal-class-name').value = existingClass;
+            const info = existingClass ? (appState.homeroomTeachers[existingClass] || {}) : {};
+            document.getElementById('homeroom-modal-teacher-name').value = info.name || '';
+            document.getElementById('homeroom-modal-teacher-nip').value = info.nip || '';
+            document.getElementById('homeroom-class-modal').classList.remove('hidden');
+        }
+
+        function closeHomeroomClassModal() {
+            document.getElementById('homeroom-class-modal').classList.add('hidden');
+        }
+
+        function handleSaveHomeroomClassModal(e) {
+            e.preventDefault();
+            const oldClass = document.getElementById('homeroom-modal-old-class').value;
+            const newClass = document.getElementById('homeroom-modal-class-name').value.trim();
+            const teacherName = document.getElementById('homeroom-modal-teacher-name').value.trim();
+            const teacherNip = document.getElementById('homeroom-modal-teacher-nip').value.trim();
+            if (!newClass) return;
+
+            if (oldClass && oldClass !== newClass) {
+                delete appState.homeroomTeachers[oldClass];
+                (appState.students || []).forEach(s => {
+                    if (s.className === oldClass) s.className = newClass;
+                });
+            }
+            appState.homeroomTeachers[newClass] = { name: teacherName, nip: teacherNip };
+            saveState(true);
+            closeHomeroomClassModal();
+            populateAllClassDropdowns();
+            renderHomeroomTable();
+            showToast(`Data kelas ${newClass} berhasil disimpan.`);
+        }
+
+        function deleteHomeroomClass(cls) {
+            delete appState.homeroomTeachers[cls];
+            saveState(true);
+            populateAllClassDropdowns();
+            renderHomeroomTable();
+            showToast(`Kelas ${cls} dihapus dari database.`);
+        }
+
+        // Pejabat Sekolah (Kepala Sekolah, Petugas/Bendahara, Petugas TU)
+        function setStaffRoleFilter(role) {
+            staffRoleFilter = role;
+            document.querySelectorAll('.staff-role-btn').forEach(btn => {
+                if (btn.dataset.staffRole === role) {
+                    btn.className = 'staff-role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white';
+                } else {
+                    btn.className = 'staff-role-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700';
+                }
+            });
+            renderOfficialStaffTable();
+        }
+
+        function getStaffRoleLabel(role) {
+            if (role === 'KEPALA_SEKOLAH') return 'Kepala Sekolah';
+            if (role === 'PETUGAS') return 'Petugas / Bendahara';
+            return 'Petugas Tata Usaha';
+        }
+
+        function renderOfficialStaffTable() {
+            const tbody = document.getElementById('official-staff-table-body');
+            if (!tbody) return;
+            const q = (document.getElementById('staff-search-input')?.value || '').trim().toLowerCase();
+            const list = (appState.officialStaff || []).filter(st => {
+                if (staffRoleFilter !== 'ALL' && st.role !== staffRoleFilter) return false;
+                if (!q) return true;
+                return (st.name || '').toLowerCase().includes(q) || (st.nip || '').toLowerCase().includes(q) || getStaffRoleLabel(st.role).toLowerCase().includes(q);
+            });
+
+            tbody.innerHTML = list.map((st, idx) => `
+                <tr class="hover:bg-slate-50">
+                    <td class="py-2.5 px-4 font-bold text-slate-500">${idx + 1}</td>
+                    <td class="py-2.5 px-4 font-extrabold text-indigo-700">${getStaffRoleLabel(st.role)}</td>
+                    <td class="py-2.5 px-4">
+                        <input id="stf-name-${st.id}" type="text" value="${escapeHTML(st.name || '')}" class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold">
+                    </td>
+                    <td class="py-2.5 px-4">
+                        <input id="stf-nip-${st.id}" type="text" value="${escapeHTML(st.nip || '')}" class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium">
+                    </td>
+                    <td class="py-2.5 px-4 text-center">
+                        <div class="inline-flex items-center gap-1">
+                            <button type="button" onclick="openOfficialStaffModal('${st.id}')" title="Edit"
+                                class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                            <button type="button" onclick="saveSingleOfficialStaff('${st.id}')" title="Simpan"
+                                class="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700"><i data-lucide="save" class="w-3.5 h-3.5"></i></button>
+                            <button type="button" onclick="deleteOfficialStaff('${st.id}')" title="Hapus"
+                                class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function saveSingleOfficialStaff(id) {
+            const st = (appState.officialStaff || []).find(s => s.id === id);
+            if (!st) return;
+            st.name = document.getElementById(`stf-name-${id}`)?.value.trim() || st.name;
+            st.nip = document.getElementById(`stf-nip-${id}`)?.value.trim() || '-';
+            saveState(true);
+            showToast(`Data ${st.name} berhasil disimpan.`);
+        }
+
+        function saveAllOfficialStaff() {
+            (appState.officialStaff || []).forEach(st => {
+                const nEl = document.getElementById(`stf-name-${st.id}`);
+                const pEl = document.getElementById(`stf-nip-${st.id}`);
+                if (nEl) st.name = nEl.value.trim();
+                if (pEl) st.nip = pEl.value.trim();
+            });
+            saveState(true);
+            showToast('Seluruh database pejabat & petugas disimpan.');
+        }
+
+        function openOfficialStaffModal(id = '') {
+            const existing = (appState.officialStaff || []).find(s => s.id === id);
+            document.getElementById('staff-modal-id').value = existing ? existing.id : '';
+            document.getElementById('staff-modal-title').textContent = existing ? 'Edit Pejabat / Petugas' : 'Tambah Pejabat / Petugas';
+            document.getElementById('staff-modal-role').value = existing ? existing.role : 'KEPALA_SEKOLAH';
+            document.getElementById('staff-modal-name').value = existing ? existing.name : '';
+            document.getElementById('staff-modal-nip').value = existing ? existing.nip : '';
+            document.getElementById('official-staff-modal').classList.remove('hidden');
+        }
+
+        function closeOfficialStaffModal() {
+            document.getElementById('official-staff-modal').classList.add('hidden');
+        }
+
+        function handleSaveOfficialStaffModal(e) {
+            e.preventDefault();
+            const id = document.getElementById('staff-modal-id').value;
+            const role = document.getElementById('staff-modal-role').value;
+            const name = document.getElementById('staff-modal-name').value.trim();
+            const nip = document.getElementById('staff-modal-nip').value.trim() || '-';
+            if (!name) return;
+
+            if (id) {
+                const idx = appState.officialStaff.findIndex(s => s.id === id);
+                if (idx >= 0) appState.officialStaff[idx] = { id, role, name, nip };
+            } else {
+                appState.officialStaff.push({ id: 'stf-' + Date.now(), role, name, nip });
+            }
+            saveState(true);
+            closeOfficialStaffModal();
+            renderOfficialStaffTable();
+            showToast('Data pejabat / petugas berhasil disimpan.');
+        }
+
+        function deleteOfficialStaff(id) {
+            appState.officialStaff = (appState.officialStaff || []).filter(s => s.id !== id);
+            saveState(true);
+            renderOfficialStaffTable();
+            showToast('Data pejabat / petugas dihapus.');
+        }
+
+        // =====================================================================
+        // MANAJEMEN DATA MASTER SISWA & IMPOR / EKSPOR EXCEL
+        // =====================================================================
+        function renderMasterStudentsTable() {
+            const tbody = document.getElementById('master-students-table-body');
+            if (!tbody) return;
+            const clsFilter = document.getElementById('master-student-class-filter').value;
+            const q = document.getElementById('master-student-search').value.trim().toLowerCase();
+            const ayLedger = getActiveYearLedger();
+
+            const list = (appState.students || []).filter(s => {
+                if (clsFilter !== 'ALL' && s.className !== clsFilter) return false;
+                if (q && !s.name.toLowerCase().includes(q) && !String(s.nis).toLowerCase().includes(q)) return false;
+                return true;
+            });
+
+            tbody.innerHTML = list.map((s, idx) => {
+                let sTab = 0, sSum = 0;
+                Object.values(ayLedger[s.id] || {}).forEach(rec => {
+                    sTab += Number(rec?.tabungan?.amount) || 0;
+                    sSum += Number(rec?.sumbangan?.amount) || 0;
+                });
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-3 px-4 font-bold text-slate-500">${idx + 1}</td>
+                        <td class="py-3 px-4 font-bold text-slate-700">${escapeHTML(s.nis)}</td>
+                        <td class="py-3 px-4 font-extrabold text-slate-900">${escapeHTML(s.name)}</td>
+                        <td class="py-3 px-4 font-bold text-indigo-700">${escapeHTML(s.className)}</td>
+                        <td class="py-3 px-4 text-right font-bold text-emerald-700">${formatRupiah(sTab)}</td>
+                        <td class="py-3 px-4 text-right font-bold text-sky-700">${formatRupiah(sSum)}</td>
+                        <td class="py-3 px-4 text-center">
+                            <div class="inline-flex items-center gap-1.5">
+                                <button type="button" onclick="openStudentFormModal('${escapeHTML(s.id)}')" class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-[11px]">Edit</button>
+                                <button type="button" onclick="deleteMasterStudent('${escapeHTML(s.id)}')" class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold text-[11px]">Hapus</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function openStudentFormModal(studentId = '') {
+            populateAllClassDropdowns();
+            const std = (appState.students || []).find(s => s.id === studentId);
+            document.getElementById('student-form-id').value = std ? std.id : '';
+            document.getElementById('student-modal-title').textContent = std ? 'Edit Data Siswa' : 'Tambah Siswa Baru';
+            document.getElementById('student-form-nis').value = std ? std.nis : '';
+            document.getElementById('student-form-name').value = std ? std.name : '';
+            if (std) document.getElementById('student-form-class').value = std.className;
+            document.getElementById('student-form-modal').classList.remove('hidden');
+        }
+
+        function closeStudentFormModal() {
+            document.getElementById('student-form-modal').classList.add('hidden');
+        }
+
+        function handleSaveStudentForm(e) {
+            e.preventDefault();
+            const id = document.getElementById('student-form-id').value;
+            const nis = document.getElementById('student-form-nis').value.trim();
+            const name = document.getElementById('student-form-name').value.trim();
+            const className = document.getElementById('student-form-class').value;
+            if (!nis || !name) return;
+
+            if (id) {
+                const idx = appState.students.findIndex(s => s.id === id);
+                if (idx >= 0) appState.students[idx] = { id, nis, name, className };
+            } else {
+                const newStd = { id: 'std-' + Date.now(), nis, name, className };
+                appState.students.push(newStd);
+                selectedStudentId = newStd.id;
+            }
+            saveState(true);
+            closeStudentFormModal();
+            refreshAllUI();
+            showToast('Data siswa berhasil disimpan.');
+        }
+
+        function deleteMasterStudent(id) {
+            appState.students = (appState.students || []).filter(s => s.id !== id);
+            saveState(true);
+            refreshAllUI();
+            showToast('Data siswa dihapus.');
+        }
+
+        function openImportStudentsModal() {
+            pendingImportedStudents = [];
+            document.getElementById('import-students-preview-info').classList.add('hidden');
+            document.getElementById('confirm-import-students-btn').classList.add('hidden');
+            document.getElementById('import-students-modal').classList.remove('hidden');
+        }
+
+        function closeImportStudentsModal() {
+            document.getElementById('import-students-modal').classList.add('hidden');
+        }
+
+        function handleImportStudentsFile(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file || !window.XLSX) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const wb = XLSX.read(e.target.result, { type: 'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(ws);
+                pendingImportedStudents = json.map((row, idx) => ({
+                    id: 'std-' + Date.now() + '-' + idx,
+                    nis: String(row.NIS || row.nis || row.Nis || (2026000 + idx + 1)).trim(),
+                    name: String(row.Nama || row['Nama Lengkap'] || row.nama || '').trim(),
+                    className: String(row.Kelas || row.kelas || 'Kelas 7A').trim()
+                })).filter(r => r.name);
+
+                const info = document.getElementById('import-students-preview-info');
+                info.textContent = `Ditemukan ${pendingImportedStudents.length} data siswa siap diimpor.`;
+                info.classList.remove('hidden');
+                if (pendingImportedStudents.length > 0) {
+                    document.getElementById('confirm-import-students-btn').classList.remove('hidden');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function confirmImportStudents() {
+            if (pendingImportedStudents.length === 0) return;
+            appState.students = [...(appState.students || []), ...pendingImportedStudents];
+            saveState(true);
+            closeImportStudentsModal();
+            refreshAllUI();
+            showToast(`${pendingImportedStudents.length} siswa berhasil diimpor.`);
+        }
+
+        function downloadStudentTemplateExcel() {
+            if (!window.XLSX) return;
+            const ws = XLSX.utils.json_to_sheet([
+                { NIS: '2026101', Nama: 'Contoh Nama Siswa 1', Kelas: 'Kelas 7A' },
+                { NIS: '2026102', Nama: 'Contoh Nama Siswa 2', Kelas: 'Kelas 7B' }
+            ]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Template Siswa');
+            XLSX.writeFile(wb, 'Template_Import_Siswa_SMPN1_Tempuran.xlsx');
+        }
+
+        // =====================================================================
+        // MANAJEMEN AKUN PENGGUNA (ADMIN)
+        // =====================================================================
+        function renderUsersManagementTable() {
+            const tbody = document.getElementById('users-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = (appState.users || []).map(u => `
+                <tr class="hover:bg-slate-50">
+                    <td class="py-3.5 px-4 font-extrabold text-slate-900">${escapeHTML(u.fullname)}</td>
+                    <td class="py-3.5 px-4 font-bold text-indigo-700">${escapeHTML(u.username)}</td>
+                    <td class="py-3.5 px-4 font-mono text-slate-600">${escapeHTML(u.password)}</td>
+                    <td class="py-3.5 px-4">
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${u.role === 'ADMIN' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}">
+                            ${u.role === 'ADMIN' ? 'Admin Penuh' : 'Petugas Input'}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4">
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${u.active !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
+                            ${u.active !== false ? 'Aktif' : 'Nonaktif'}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 text-center">
+                        <div class="inline-flex items-center gap-1.5">
+                            <button type="button" onclick="openUserModal('${escapeHTML(u.id)}')" class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-[11px]">Edit</button>
+                            ${u.username !== 'admin' ? `<button type="button" onclick="deleteUserAccount('${escapeHTML(u.id)}')" class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold text-[11px]">Hapus</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function openUserModal(userId = '') {
+            const u = (appState.users || []).find(item => item.id === userId);
+            document.getElementById('user-form-id').value = u ? u.id : '';
+            document.getElementById('user-modal-title').textContent = u ? 'Edit Akun Pengguna' : 'Buat Akun Pengguna Baru';
+            document.getElementById('user-form-fullname').value = u ? u.fullname : '';
+            document.getElementById('user-form-username').value = u ? u.username : '';
+            document.getElementById('user-form-password').value = u ? u.password : '';
+            document.getElementById('user-form-role').value = u ? u.role : 'OPERATOR';
+            document.getElementById('user-account-modal').classList.remove('hidden');
+        }
+
+        function closeUserModal() {
+            document.getElementById('user-account-modal').classList.add('hidden');
+        }
+
+        function handleSaveUserAccount(e) {
+            e.preventDefault();
+            const id = document.getElementById('user-form-id').value;
+            const fullname = document.getElementById('user-form-fullname').value.trim();
+            const username = document.getElementById('user-form-username').value.trim();
+            const password = document.getElementById('user-form-password').value.trim();
+            const role = document.getElementById('user-form-role').value;
+            if (!fullname || !username || !password) return;
+
+            if (id) {
+                const idx = appState.users.findIndex(u => u.id === id);
+                if (idx >= 0) appState.users[idx] = Object.assign({}, appState.users[idx], { fullname, username, password, role });
+            } else {
+                appState.users.push({ id: 'usr-' + Date.now(), fullname, username, password, role, active: true });
+            }
+            saveState(true);
+            closeUserModal();
+            renderUsersManagementTable();
+            showToast('Akun pengguna berhasil disimpan.');
+        }
+
+        function deleteUserAccount(id) {
+            appState.users = (appState.users || []).filter(u => u.id !== id);
+            saveState(true);
+            renderUsersManagementTable();
+            showToast('Akun pengguna dihapus.');
+        }
+
+        // =====================================================================
+        // LEMBAR LAPORAN RESMI & CETAK KUITANSI / REKAP (IFRAME AMAN)
+        // =====================================================================
+        function initOfficialReportControls() {
+            populateAllClassDropdowns();
+            const dateInp = document.getElementById('report-date-place');
+            if (dateInp && !dateInp.value) {
+                dateInp.value = `Tempuran, ${formatShortDate(getTodayISO())}`;
+            }
+            onReportTypeChange();
+        }
+
+        function onReportTypeChange() {
+            const type = document.getElementById('report-type-select').value;
+            const clsWrap = document.getElementById('report-class-wrapper');
+            const kepsek = (appState.officialStaff || []).find(s => s.role === 'KEPALA_SEKOLAH') || { name: 'Kepala Sekolah', nip: '-' };
+            const tu = (appState.officialStaff || []).find(s => s.role === 'PETUGAS_TU' || s.role === 'PETUGAS') || { name: 'Petugas Tata Usaha', nip: '-' };
+
+            if (type === 'WALIKELAS') {
+                clsWrap.classList.remove('hidden');
+                onReportClassChange();
+            } else {
+                clsWrap.classList.add('hidden');
+                document.getElementById('report-left-signer-title').textContent = 'Kepala SMP Negeri 1 Tempuran';
+                document.getElementById('report-left-signer-name').value = kepsek.name;
+                document.getElementById('report-left-signer-nip').value = kepsek.nip;
+                document.getElementById('report-right-signer-title').textContent = 'Bendahara / Petugas TU';
+                document.getElementById('report-right-signer-name').value = tu.name;
+                document.getElementById('report-right-signer-nip').value = tu.nip;
+                renderOfficialReportPreview();
+            }
+        }
+
+        function onReportClassChange() {
+            const cls = document.getElementById('report-class-select').value;
+            const hr = (appState.homeroomTeachers && appState.homeroomTeachers[cls]) || { name: '', nip: '' };
+            const tu = (appState.officialStaff || []).find(s => s.role === 'PETUGAS_TU' || s.role === 'PETUGAS') || { name: 'Petugas Tata Usaha', nip: '-' };
+
+            document.getElementById('report-left-signer-title').textContent = `Wali ${cls}`;
+            document.getElementById('report-left-signer-name').value = hr.name || `Wali ${cls}`;
+            document.getElementById('report-left-signer-nip').value = hr.nip || '-';
+            document.getElementById('report-right-signer-title').textContent = 'Petugas Tata Usaha';
+            document.getElementById('report-right-signer-name').value = tu.name;
+            document.getElementById('report-right-signer-nip').value = tu.nip;
+            renderOfficialReportPreview();
+        }
+
+        function buildSchoolLetterheadHTML(subtitle) {
+            const logoSrc = (appState && appState.schoolLogo) ? appState.schoolLogo : DEFAULT_SCHOOL_LOGO_SVG;
+            return `
+                <div style="display:flex;align-items:center;gap:14px;border-bottom:3px double #0f172a;padding-bottom:10px;margin-bottom:16px;">
+                    <img src="${logoSrc}" style="width:64px;height:64px;object-fit:contain;" />
+                    <div style="flex:1;text-align:center;">
+                        <div style="font-size:12px;font-weight:700;letter-spacing:0.5px;">PEMERINTAH KABUPATEN MAGELANG • DINAS PENDIDIKAN DAN KEBUDAYAAN</div>
+                        <div style="font-size:18px;font-weight:800;margin:2px 0;">SMP NEGERI 1 TEMPURAN</div>
+                        <div style="font-size:11px;color:#334155;">${escapeHTML(subtitle)} • Tahun Ajaran ${escapeHTML(appState.activeAcademicYear)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderOfficialReportPreview() {
+            const container = document.getElementById('official-report-preview-container');
+            if (!container) return;
+            const type = document.getElementById('report-type-select').value;
+            const cls = document.getElementById('report-class-select').value;
+            const datePlace = document.getElementById('report-date-place').value;
+            const leftTitle = document.getElementById('report-left-signer-title').textContent;
+            const leftName = document.getElementById('report-left-signer-name').value;
+            const leftNip = document.getElementById('report-left-signer-nip').value;
+            const rightTitle = document.getElementById('report-right-signer-title').textContent;
+            const rightName = document.getElementById('report-right-signer-name').value;
+            const rightNip = document.getElementById('report-right-signer-nip').value;
+
+            const ayLedger = getActiveYearLedger();
+            let tableHTML = '';
+
+            if (type === 'WALIKELAS') {
+                const stds = (appState.students || []).filter(s => s.className === cls);
+                let gTab = 0, gSum = 0;
+                const rows = stds.map((s, i) => {
+                    let sTab = 0, sSum = 0;
+                    Object.values(ayLedger[s.id] || {}).forEach(rec => {
+                        sTab += Number(rec?.tabungan?.amount) || 0;
+                        sSum += Number(rec?.sumbangan?.amount) || 0;
+                    });
+                    gTab += sTab; gSum += sSum;
+                    return `<tr>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:center;">${i + 1}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;">${escapeHTML(s.nis)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;font-weight:600;">${escapeHTML(s.name)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(sTab)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(sSum)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;font-weight:700;">${formatRupiah(sTab + sSum)}</td>
+                    </tr>`;
+                }).join('');
+
+                tableHTML = `
+                    <div style="text-align:center;font-weight:800;font-size:14px;margin-bottom:12px;">REKAPITULASI TABUNGAN & SUMBANGAN SUKARELA ${escapeHTML(cls.toUpperCase())}</div>
+                    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                        <thead>
+                            <tr style="background:#f1f5f9;">
+                                <th style="border:1px solid #cbd5e1;padding:6px;">No</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">NIS</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">Nama Siswa</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">Tabungan</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">Sumbangan</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                        <tfoot>
+                            <tr style="background:#f8fafc;font-weight:800;">
+                                <td colspan="3" style="border:1px solid #cbd5e1;padding:6px;text-align:right;">JUMLAH TOTAL</td>
+                                <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(gTab)}</td>
+                                <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(gSum)}</td>
+                                <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(gTab + gSum)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                `;
+            } else {
+                const allTx = getAllFlattenedTransactions(null);
+                const classes = getAllClassNames();
+                let gTab = 0, gSum = 0;
+                const rows = classes.map((c, i) => {
+                    let cTab = 0, cSum = 0;
+                    allTx.filter(t => t.className === c).forEach(t => { cTab += t.tabungan; cSum += t.sumbangan; });
+                    gTab += cTab; gSum += cSum;
+                    return `<tr>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:center;">${i + 1}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;font-weight:600;">${escapeHTML(c)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(cTab)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(cSum)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;font-weight:700;">${formatRupiah(cTab + cSum)}</td>
+                    </tr>`;
+                }).join('');
+
+                tableHTML = `
+                    <div style="text-align:center;font-weight:800;font-size:14px;margin-bottom:12px;">LAPORAN REKAPITULASI PENERIMAAN TABUNGAN & SUMBANGAN SEKOLAH</div>
+                    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                        <thead>
+                            <tr style="background:#f1f5f9;">
+                                <th style="border:1px solid #cbd5e1;padding:6px;">No</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">Kelas / Rombel</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">Total Tabungan</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">Total Sumbangan</th>
+                                <th style="border:1px solid #cbd5e1;padding:6px;">Total Keseluruhan</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                        <tfoot>
+                            <tr style="background:#f8fafc;font-weight:800;">
+                                <td colspan="2" style="border:1px solid #cbd5e1;padding:6px;text-align:right;">GRAND TOTAL SEKOLAH</td>
+                                <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(gTab)}</td>
+                                <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(gSum)}</td>
+                                <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(gTab + gSum)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                `;
+            }
+
+            container.innerHTML = `
+                ${buildSchoolLetterheadHTML('Laporan Penerimaan Tabungan & Sumbangan Sukarela')}
+                ${tableHTML}
+                <div style="display:flex;justify-content:space-between;margin-top:28px;font-size:11px;">
+                    <div style="text-align:center;width:42%;">
+                        <div>Mengetahui,</div>
+                        <div style="font-weight:700;">${escapeHTML(leftTitle)}</div>
+                        <div style="height:56px;"></div>
+                        <div style="font-weight:800;text-decoration:underline;">${escapeHTML(leftName)}</div>
+                        <div>NIP. ${escapeHTML(leftNip)}</div>
+                    </div>
+                    <div style="text-align:center;width:42%;">
+                        <div>${escapeHTML(datePlace)}</div>
+                        <div style="font-weight:700;">${escapeHTML(rightTitle)}</div>
+                        <div style="height:56px;"></div>
+                        <div style="font-weight:800;text-decoration:underline;">${escapeHTML(rightName)}</div>
+                        <div>NIP. ${escapeHTML(rightNip)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function triggerSafePrint(innerHTML, title = 'Cetak Dokumen') {
+            const iframe = document.getElementById('hidden-print-frame');
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>${escapeHTML(title)}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; color: #0f172a; padding: 20px; }
+                        table { width: 100%; border-collapse: collapse; }
+                    </style>
+                </head>
+                <body>${innerHTML}</body>
+                </html>
+            `);
+            doc.close();
+            setTimeout(() => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            }, 250);
+        }
+
+        function printSingleReceipt(studentId, monthKey) {
+            const student = (appState.students || []).find(s => s.id === studentId);
+            const monthObj = MONTHS_LIST.find(m => m.key === monthKey);
+            const rec = getStudentMonthRecord(studentId, monthKey);
+            if (!student || !monthObj || !rec) return;
+
+            const tAmt = Number(rec.tabungan?.amount) || 0;
+            const sAmt = Number(rec.sumbangan?.amount) || 0;
+            const dateStr = formatShortDate(rec.tabungan?.date || rec.sumbangan?.date);
+            const officerObj = rec.tabungan?.ttdValue ? rec.tabungan : (rec.sumbangan || null);
+            const officerHTML = (officerObj?.ttdType === 'draw' && officerObj.ttdValue.startsWith('data:image'))
+                ? `<img src="${officerObj.ttdValue}" style="height:48px;object-fit:contain;" />`
+                : `<div style="height:44px;display:flex;align-items:flex-end;justify-content:center;font-weight:700;">${escapeHTML(officerObj?.ttdValue || 'Petugas TU')}</div>`;
+
+            const html = `
+                <div style="max-width:560px;margin:0 auto;border:2px solid #0f172a;padding:18px;border-radius:10px;">
+                    ${buildSchoolLetterheadHTML('BUKTI SETORAN TABUNGAN & SUMBANGAN SISWA')}
+                    <table style="font-size:12px;margin-bottom:12px;">
+                        <tr><td style="padding:3px 0;width:140px;">Nama Siswa</td><td>: <strong>${escapeHTML(student.name)}</strong></td></tr>
+                        <tr><td style="padding:3px 0;">NIS / Kelas</td><td>: ${escapeHTML(student.nis)} / <strong>${escapeHTML(student.className)}</strong></td></tr>
+                        <tr><td style="padding:3px 0;">Bulan Tagihan</td><td>: <strong>${escapeHTML(monthObj.label)} (${escapeHTML(appState.activeAcademicYear)})</strong></td></tr>
+                        <tr><td style="padding:3px 0;">Tanggal Setor</td><td>: ${dateStr}</td></tr>
+                    </table>
+                    <table style="font-size:12px;border:1px solid #cbd5e1;margin-bottom:14px;">
+                        <tr style="background:#f1f5f9;">
+                            <th style="border:1px solid #cbd5e1;padding:6px;text-align:left;">Uraian Setoran</th>
+                            <th style="border:1px solid #cbd5e1;padding:6px;text-align:right;">Nominal</th>
+                        </tr>
+                        <tr>
+                            <td style="border:1px solid #cbd5e1;padding:6px;">Setoran Tabungan Siswa</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(tAmt)}</td>
+                        </tr>
+                        <tr>
+                            <td style="border:1px solid #cbd5e1;padding:6px;">Sumbangan Sukarela</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(sAmt)}</td>
+                        </tr>
+                        <tr style="background:#f8fafc;font-weight:800;">
+                            <td style="border:1px solid #cbd5e1;padding:6px;">TOTAL DITERIMA</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(tAmt + sAmt)}</td>
+                        </tr>
+                    </table>
+                    <div style="display:flex;justify-content:flex-end;font-size:11px;">
+                        <div style="text-align:center;width:200px;">
+                            <div>Tempuran, ${dateStr}</div>
+                            <div>Petugas Tata Usaha,</div>
+                            ${officerHTML}
+                            <div style="border-top:1px solid #0f172a;margin-top:4px;padding-top:2px;">Sah & Tercatat di Sistem</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            triggerSafePrint(html, `Bukti Setoran - ${student.name}`);
+        }
+
+        function printStudentStatement() {
+            const student = (appState.students || []).find(s => s.id === selectedStudentId);
+            if (!student) return;
+            let sTab = 0, sSum = 0;
+            const rows = MONTHS_LIST.map((m, i) => {
+                const rec = getStudentMonthRecord(student.id, m.key);
+                const t = Number(rec?.tabungan?.amount) || 0;
+                const s = Number(rec?.sumbangan?.amount) || 0;
+                sTab += t; sSum += s;
+                return `<tr>
+                    <td style="border:1px solid #cbd5e1;padding:5px;text-align:center;">${i + 1}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;">${m.label}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;text-align:right;">${formatRupiah(t)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;text-align:right;">${formatRupiah(s)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;text-align:right;font-weight:700;">${formatRupiah(t + s)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;">${formatShortDate(rec?.tabungan?.date || rec?.sumbangan?.date)}</td>
+                </tr>`;
+            }).join('');
+
+            const html = `
+                ${buildSchoolLetterheadHTML('KARTU REKAPITULASI TABUNGAN & SUMBANGAN SISWA')}
+                <div style="font-size:12px;margin-bottom:10px;">
+                    Nama Siswa: <strong>${escapeHTML(student.name)}</strong> • NIS: <strong>${escapeHTML(student.nis)}</strong> • Kelas: <strong>${escapeHTML(student.className)}</strong>
+                </div>
+                <table style="font-size:11px;border:1px solid #cbd5e1;">
+                    <thead>
+                        <tr style="background:#f1f5f9;">
+                            <th style="border:1px solid #cbd5e1;padding:5px;">No</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Bulan</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Tabungan</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Sumbangan</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Total</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Tanggal</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                    <tfoot>
+                        <tr style="font-weight:800;background:#f8fafc;">
+                            <td colspan="2" style="border:1px solid #cbd5e1;padding:6px;text-align:right;">TOTAL</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(sTab)}</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(sSum)}</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(sTab + sSum)}</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            `;
+            triggerSafePrint(html, `Kartu Kas - ${student.name}`);
+        }
+
+        function printDailyRecap() {
+            const rows = getDailyStudentTransactions(recapSelectedDateISO);
+            let dTab = 0, dSum = 0;
+            const body = rows.map((r, i) => {
+                dTab += r.tabungan; dSum += r.sumbangan;
+                return `<tr>
+                    <td style="border:1px solid #cbd5e1;padding:5px;text-align:center;">${i + 1}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;">${escapeHTML(r.studentName)} (${escapeHTML(r.nis)})</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;">${escapeHTML(r.className)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;">${escapeHTML(r.monthLabel)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;text-align:right;">${formatRupiah(r.tabungan)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;text-align:right;">${formatRupiah(r.sumbangan)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:5px;text-align:right;font-weight:700;">${formatRupiah(r.total)}</td>
+                </tr>`;
+            }).join('');
+
+            const html = `
+                ${buildSchoolLetterheadHTML(`LAPORAN PENERIMAAN HARIAN TANGGAL ${formatShortDate(recapSelectedDateISO).toUpperCase()}`)}
+                <table style="font-size:11px;border:1px solid #cbd5e1;">
+                    <thead>
+                        <tr style="background:#f1f5f9;">
+                            <th style="border:1px solid #cbd5e1;padding:5px;">No</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Nama Siswa & NIS</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Kelas</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Bulan</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Tabungan</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Sumbangan</th>
+                            <th style="border:1px solid #cbd5e1;padding:5px;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body || '<tr><td colspan="7" style="padding:10px;text-align:center;">Tidak ada transaksi.</td></tr>'}</tbody>
+                    <tfoot>
+                        <tr style="font-weight:800;background:#f8fafc;">
+                            <td colspan="4" style="border:1px solid #cbd5e1;padding:6px;text-align:right;">TOTAL HARIAN</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(dTab)}</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(dSum)}</td>
+                            <td style="border:1px solid #cbd5e1;padding:6px;text-align:right;">${formatRupiah(dTab + dSum)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            `;
+            triggerSafePrint(html, `Rekap Harian ${recapSelectedDateISO}`);
+        }
+
+        function printSchoolRecap() {
+            initOfficialReportControls();
+            document.getElementById('report-type-select').value = 'KEPSEK';
+            onReportTypeChange();
+            printOfficialReport();
+        }
+
+        function printOfficialReport() {
+            renderOfficialReportPreview();
+            const html = document.getElementById('official-report-preview-container').innerHTML;
+            triggerSafePrint(html, 'Lembar Laporan Resmi SMPN 1 Tempuran');
+        }
+
+        // =====================================================================
+        // EKSPOR EXCEL & BACKUP / RESTORE JSON
+        // =====================================================================
+        function exportHistoryToExcel() {
+            if (!window.XLSX) return;
+            const rows = getAllFlattenedTransactions(null).map((r, i) => ({
+                No: i + 1, Tanggal: r.primaryDate, NIS: r.nis, Nama_Siswa: r.studentName,
+                Kelas: r.className, Bulan: r.monthLabel, Tabungan: r.tabungan,
+                Sumbangan: r.sumbangan, Total: r.total, Petugas: r.officerName
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Riwayat Transaksi');
+            XLSX.writeFile(wb, `Riwayat_Transaksi_${appState.activeAcademicYear.replace('/', '-')}.xlsx`);
+        }
+
+        function exportDailyRecapExcel() {
+            if (!window.XLSX) return;
+            const rows = getDailyStudentTransactions(recapSelectedDateISO).map((r, i) => ({
+                No: i + 1, Tanggal: recapSelectedDateISO, NIS: r.nis, Nama_Siswa: r.studentName,
+                Kelas: r.className, Bulan: r.monthLabel, Tabungan: r.tabungan,
+                Sumbangan: r.sumbangan, Total: r.total, Petugas: r.officerName
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Setoran Harian');
+            XLSX.writeFile(wb, `Setoran_Harian_${recapSelectedDateISO}.xlsx`);
+        }
+
+        function exportFullRecapExcel() { exportHistoryToExcel(); }
+        function exportOfficialReportExcel() { exportHistoryToExcel(); }
+
+        function exportMasterStudentsExcel() {
+            if (!window.XLSX) return;
+            const rows = (appState.students || []).map((s, i) => ({ No: i + 1, NIS: s.nis, Nama: s.name, Kelas: s.className }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Data Siswa');
+            XLSX.writeFile(wb, 'Data_Master_Siswa_SMPN1_Tempuran.xlsx');
+        }
+
+        function exportHomeroomExcel() {
+            if (!window.XLSX) return;
+            const rows = getAllClassNames().map((cls, i) => ({
+                No: i + 1, Kelas: cls,
+                Wali_Kelas: appState.homeroomTeachers[cls]?.name || '',
+                NIP: appState.homeroomTeachers[cls]?.nip || ''
+            }));
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Wali Kelas');
+            XLSX.writeFile(wb, 'Database_Wali_Kelas_SMPN1_Tempuran.xlsx');
+        }
+
+        function downloadFullBackupJSON() {
+            const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Backup_SMPN1_Tempuran_${getTodayISO()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('File cadangan JSON berhasil diunduh.');
+        }
+
+        function restoreFullBackupJSON(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = ensureStateIntegrity(JSON.parse(e.target.result));
+                    appState = parsed;
+                    saveState(true);
+                    refreshAllUI();
+                    showToast('Database berhasil dipulihkan & disinkronkan ke cloud.');
+                } catch (err) {
+                    showToast('File JSON cadangan tidak valid.', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // =====================================================================
+        // INISIALISASI APLIKASI SAAT HALAMAN DIMUAT
+        // =====================================================================
+        window.onload = function() {
+            loadLocalState();
+            applySchoolLogos();
+            initSignaturePad();
+
+            // Pulihkan sesi login jika sebelumnya sudah login di perangkat ini
+            try {
+                const rawSession = localStorage.getItem(SESSION_KEY);
+                if (rawSession) {
+                    const sess = JSON.parse(rawSession);
+                    const found = (appState.users || []).find(
+                        u => (u.id === sess.userId || u.username === sess.username) && u.active !== false
+                    );
+                    if (found) {
+                        currentUser = found;
+                        enterAuthenticatedApp();
+                    }
+                }
+            } catch (e) {}
+
+            if (window.lucide) lucide.createIcons();
+
+            // Sinkronisasi awal dan berkala dengan Firebase Realtime Database
+            pullStateFromCloud(true);
+            setInterval(() => pullStateFromCloud(false), 15000);
+        };
+    </script>
+</body>
+</html>
