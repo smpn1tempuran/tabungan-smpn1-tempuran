@@ -1807,35 +1807,74 @@
                 const stdIds = new Set([...Object.keys(cAy), ...Object.keys(lAy)]);
                 stdIds.forEach(sId => {
                     merged.ledger[ay][sId] = {};
-                    const cMonths = cAy[sId] || {};
-                    const lMonths = lAy[sId] || {};
-                    const mKeys = new Set([...Object.keys(cMonths), ...Object.keys(lMonths)]);
+                    const cStd = cAy[sId] || {};
+                    const lStd = lAy[sId] || {};
+                    const mKeys = new Set([...Object.keys(cStd), ...Object.keys(lStd)]);
                     mKeys.forEach(mKey => {
-                        const cRec = cMonths[mKey];
-                        const lRec = lMonths[mKey];
-                        if (!cRec) merged.ledger[ay][sId][mKey] = lRec;
-                        else if (!lRec) merged.ledger[ay][sId][mKey] = cRec;
-                        else {
+                        const cRec = cStd[mKey];
+                        const lRec = lStd[mKey];
+                        if (!cRec) {
+                            merged.ledger[ay][sId][mKey] = lRec;
+                        } else if (!lRec) {
+                            merged.ledger[ay][sId][mKey] = cRec;
+                        } else {
                             merged.ledger[ay][sId][mKey] = (Number(lRec.updatedAt) || 0) >= (Number(cRec.updatedAt) || 0) ? lRec : cRec;
                         }
                     });
                 });
             });
 
-            // Gabungkan Wali Kelas & Pejabat
+            // Gabungkan Wali Kelas
             merged.homeroomTeachers = Object.assign({}, cloudSt.homeroomTeachers || {});
             Object.entries(localSt.homeroomTeachers || {}).forEach(([cls, info]) => {
-                if (!merged.homeroomTeachers[cls] || info.name || info.nip) {
+                const existing = merged.homeroomTeachers[cls];
+                if (!existing || (!existing.name && info.name) || (Number(localSt.updatedAt) || 0) >= (Number(cloudSt.updatedAt) || 0)) {
                     merged.homeroomTeachers[cls] = info;
                 }
             });
 
+            // Gabungkan Pejabat & Petugas
             const staffMap = new Map();
             (cloudSt.officialStaff || []).forEach(st => staffMap.set(st.id, st));
-            (localSt.officialStaff || []).forEach(st => staffMap.set(st.id, st));
+            (localSt.officialStaff || []).forEach(st => {
+                if (!staffMap.has(st.id) || (Number(localSt.updatedAt) || 0) >= (Number(cloudSt.updatedAt) || 0)) {
+                    staffMap.set(st.id, st);
+                }
+            });
             merged.officialStaff = Array.from(staffMap.values());
 
             return merged;
+        }
+
+        function sanitizeKeysForFirebase(obj) {
+            if (Array.isArray(obj)) {
+                return obj.map(item => sanitizeKeysForFirebase(item));
+            }
+            if (obj && typeof obj === 'object') {
+                const cleanObj = {};
+                Object.entries(obj).forEach(([k, v]) => {
+                    if (v === undefined) return;
+                    const safeKey = String(k).replace(/\//g, '_SLASH_').replace(/[.#$\[\]]/g, '_');
+                    cleanObj[safeKey] = sanitizeKeysForFirebase(v);
+                });
+                return cleanObj;
+            }
+            return obj;
+        }
+
+        function restoreKeysFromFirebase(obj) {
+            if (Array.isArray(obj)) {
+                return obj.map(item => restoreKeysFromFirebase(item));
+            }
+            if (obj && typeof obj === 'object') {
+                const restoredObj = {};
+                Object.entries(obj).forEach(([k, v]) => {
+                    const origKey = String(k).replace(/_SLASH_/g, '/');
+                    restoredObj[origKey] = restoreKeysFromFirebase(v);
+                });
+                return restoredObj;
+            }
+            return obj;
         }
 
         async function pushStateToCloud() {
@@ -1844,10 +1883,11 @@
             updateCloudStatusUI('syncing', 'Menyimpan ke Cloud...');
             try {
                 // Pisahkan logo jika terlalu besar agar tidak ditolak batas ukuran REST API
-                const payloadToSend = Object.assign({}, appState);
-                if (payloadToSend.schoolLogo && payloadToSend.schoolLogo.length > 150000) {
-                    payloadToSend.schoolLogo = '';
+                const payloadCopy = Object.assign({}, appState);
+                if (payloadCopy.schoolLogo && payloadCopy.schoolLogo.length > 150000) {
+                    payloadCopy.schoolLogo = '';
                 }
+                const payloadToSend = sanitizeKeysForFirebase(payloadCopy);
                 const res = await fetch(FIREBASE_RTDB_URL, {
                     method: 'PUT',
                     body: JSON.stringify(payloadToSend)
@@ -1863,7 +1903,7 @@
                 }
                 updateCloudStatusUI('online', 'Online • Tersinkronisasi');
             } catch (err) {
-                const currentText = document.getElementById('cloud-sync-status')?.textContent || '';
+                const currentText = document.querySelector('.cloud-sync-status-display')?.textContent || '';
                 if (!currentText.includes('Rules') && !currentText.includes('HTTP')) {
                     updateCloudStatusUI('offline', 'Offline (Cek Internet / Rules)');
                 }
@@ -1899,7 +1939,8 @@
                     }
                     throw new Error('HTTP ' + res.status);
                 }
-                const cloudData = await res.json();
+                const rawCloudData = await res.json();
+                const cloudData = rawCloudData ? restoreKeysFromFirebase(rawCloudData) : null;
 
                 if (cloudData && typeof cloudData === 'object') {
                     const merged = mergeLocalAndCloudStates(appState, cloudData);
