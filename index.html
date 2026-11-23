@@ -2147,8 +2147,11 @@
         // =====================================================================
         function getAllClassNames() {
             const hrKeys = Object.keys(appState.homeroomTeachers || {});
-            const set = new Set(hrKeys.length > 0 ? hrKeys : DEFAULT_CLASSES);
-            (appState.students || []).forEach(s => { if (s.className) set.add(s.className); });
+            const deletedSet = new Set(Array.isArray(appState.deletedHomeroomClasses) ? appState.deletedHomeroomClasses : []);
+            const set = new Set((hrKeys.length > 0 ? hrKeys : DEFAULT_CLASSES).filter(c => !deletedSet.has(c)));
+            (appState.students || []).forEach(s => {
+                if (s.className && !deletedSet.has(s.className)) set.add(s.className);
+            });
             return Array.from(set).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
         }
 
@@ -3240,6 +3243,10 @@
             const teacherNip = document.getElementById('homeroom-modal-teacher-nip').value.trim();
             if (!newClass) return;
 
+            if (Array.isArray(appState.deletedHomeroomClasses)) {
+                appState.deletedHomeroomClasses = appState.deletedHomeroomClasses.filter(c => c !== newClass);
+            }
+
             if (oldClass && oldClass !== newClass) {
                 delete appState.homeroomTeachers[oldClass];
                 (appState.students || []).forEach(s => {
@@ -3255,6 +3262,12 @@
         }
 
         function deleteHomeroomClass(cls) {
+            if (!Array.isArray(appState.deletedHomeroomClasses)) {
+                appState.deletedHomeroomClasses = [];
+            }
+            if (!appState.deletedHomeroomClasses.includes(cls)) {
+                appState.deletedHomeroomClasses.push(cls);
+            }
             if (appState.homeroomTeachers && Object.prototype.hasOwnProperty.call(appState.homeroomTeachers, cls)) {
                 delete appState.homeroomTeachers[cls];
             }
