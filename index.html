@@ -730,8 +730,8 @@
                     <!-- Panel Rincian Tanggal Terpilih -->
                     <div class="p-5 bg-slate-50/60 flex flex-col justify-between space-y-4">
                         <div class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Rincian Tanggal Terpilih</span>
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Ringkasan Tanggal</span>
                                 <span id="recap-cal-selected-badge" class="px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-800">-</span>
                             </div>
                             <div id="recap-cal-day-summary" class="grid grid-cols-2 gap-2">
@@ -744,8 +744,64 @@
                                     <p id="recap-cal-day-sum" class="text-sm font-extrabold font-mono text-amber-600 mt-0.5">Rp 0</p>
                                 </div>
                             </div>
-                            <div id="recap-cal-day-list" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+                            <div class="p-3 rounded-2xl bg-slate-900 text-white flex items-center justify-between">
+                                <div>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Total Masuk Tanggal Ini</span>
+                                    <p id="recap-cal-day-grand" class="text-base font-extrabold font-mono mt-0.5">Rp 0</p>
+                                </div>
+                                <span id="recap-cal-day-count-badge" class="px-2.5 py-1 rounded-xl bg-white/10 text-xs font-bold text-slate-200">0 Transaksi</span>
+                            </div>
+                            <div id="recap-cal-day-list" class="space-y-2 max-h-56 overflow-y-auto pr-1"></div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- TABEL RINCIAN TRANSAKSI KHUSUS TANGGAL TERPILIH -->
+                <div class="border-t border-slate-200 bg-indigo-50/30">
+                    <div class="p-5 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                                <i data-lucide="calendar-check-2" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h4 id="recap-daily-detail-title" class="font-extrabold text-sm sm:text-base text-slate-900">Rincian Transaksi Tanggal Terpilih</h4>
+                                <p class="text-xs text-slate-500">Hanya menampilkan daftar transaksi siswa yang disetor pada tanggal yang diklik di kalender</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="date" id="recap-direct-date-input" onchange="onRecapDirectDateInput(this.value)"
+                                class="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <button type="button" onclick="printDailyRecapSheet()"
+                                class="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition">
+                                <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-600"></i>
+                                <span>Cetak Harian</span>
+                            </button>
+                            <button type="button" onclick="exportDailyRecapExcel()"
+                                class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition">
+                                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                                <span>Ekspor Tanggal Ini</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto bg-white">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+                                    <th class="py-3 px-5 w-12 text-center">No</th>
+                                    <th class="py-3 px-5">Nama Siswa & NIS</th>
+                                    <th class="py-3 px-5">Kelas</th>
+                                    <th class="py-3 px-5">Bulan Tagihan</th>
+                                    <th class="py-3 px-5 text-right">Tabungan</th>
+                                    <th class="py-3 px-5 text-right">Sumbangan Sukarela</th>
+                                    <th class="py-3 px-5 text-right">Total Setor</th>
+                                    <th class="py-3 px-5 text-center">Petugas TU</th>
+                                    <th class="py-3 px-5 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recap-daily-detail-tbody" class="divide-y divide-slate-100"></tbody>
+                            <tfoot id="recap-daily-detail-tfoot"></tfoot>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -4665,6 +4721,40 @@
             renderRecapCalendar();
         }
 
+        function onRecapDirectDateInput(isoDate) {
+            if (!isoDate) return;
+            const parts = isoDate.split('-');
+            if (parts.length === 3) {
+                recapCalYear = parseInt(parts[0], 10);
+                recapCalMonth = parseInt(parts[1], 10) - 1;
+            }
+            recapSelectedDateISO = isoDate;
+            renderRecapCalendar();
+        }
+
+        function getDailyStudentTransactions(isoDate) {
+            const allTx = getAllFlattenedTransactions(null);
+            const rows = [];
+            allTx.forEach(tx => {
+                const tabOnDate = (tx.tabungan > 0 && tx.tabunganDate === isoDate) ? tx.tabungan : 0;
+                const sumOnDate = (tx.sumbangan > 0 && tx.sumbanganDate === isoDate) ? tx.sumbangan : 0;
+                if (tabOnDate > 0 || sumOnDate > 0) {
+                    const details = [];
+                    if (tabOnDate > 0) details.push(`Tabungan ${formatRupiah(tabOnDate)}`);
+                    if (sumOnDate > 0) details.push(`Sumbangan ${formatRupiah(sumOnDate)}`);
+                    rows.push({
+                        ...tx,
+                        tabOnDate,
+                        sumOnDate,
+                        totalOnDate: tabOnDate + sumOnDate,
+                        paymentSummary: details.join(' + ')
+                    });
+                }
+            });
+            rows.sort((a, b) => a.studentClass.localeCompare(b.studentClass, 'id', { numeric: true }) || a.studentName.localeCompare(b.studentName));
+            return rows;
+        }
+
         function renderRecapCalendar() {
             const grid = document.getElementById('recap-calendar-grid');
             if (!grid) return;
@@ -4736,36 +4826,222 @@
             const badgeEl = document.getElementById('recap-cal-selected-badge');
             const tabEl = document.getElementById('recap-cal-day-tab');
             const sumEl = document.getElementById('recap-cal-day-sum');
+            const grandEl = document.getElementById('recap-cal-day-grand');
+            const countBadgeEl = document.getElementById('recap-cal-day-count-badge');
             const listEl = document.getElementById('recap-cal-day-list');
+            const detailTitleEl = document.getElementById('recap-daily-detail-title');
+            const directDateInput = document.getElementById('recap-direct-date-input');
+            const detailTbody = document.getElementById('recap-daily-detail-tbody');
+            const detailTfoot = document.getElementById('recap-daily-detail-tfoot');
 
-            const selectedInfo = dailyMap[recapSelectedDateISO];
-            if (badgeEl) badgeEl.textContent = formatShortDate(recapSelectedDateISO);
-            if (tabEl) tabEl.textContent = formatRupiah(selectedInfo ? selectedInfo.tab : 0);
-            if (sumEl) sumEl.textContent = formatRupiah(selectedInfo ? selectedInfo.sum : 0);
+            const dailyRows = getDailyStudentTransactions(recapSelectedDateISO);
+            const dayTabTotal = dailyRows.reduce((acc, r) => acc + r.tabOnDate, 0);
+            const daySumTotal = dailyRows.reduce((acc, r) => acc + r.sumOnDate, 0);
+            const dayGrandTotal = dayTabTotal + daySumTotal;
+            const formattedSelected = formatShortDate(recapSelectedDateISO);
+
+            if (badgeEl) badgeEl.textContent = formattedSelected;
+            if (tabEl) tabEl.textContent = formatRupiah(dayTabTotal);
+            if (sumEl) sumEl.textContent = formatRupiah(daySumTotal);
+            if (grandEl) grandEl.textContent = formatRupiah(dayGrandTotal);
+            if (countBadgeEl) countBadgeEl.textContent = `${dailyRows.length} Siswa`;
+            if (detailTitleEl) detailTitleEl.textContent = `Rincian Transaksi Tanggal ${formattedSelected}`;
+            if (directDateInput) directDateInput.value = recapSelectedDateISO;
 
             if (listEl) {
-                if (!selectedInfo || selectedInfo.items.length === 0) {
+                if (dailyRows.length === 0) {
                     listEl.innerHTML = `
                         <div class="p-4 rounded-2xl bg-white border border-slate-200/80 text-center text-xs text-slate-400">
-                            Tidak ada setoran masuk pada tanggal ${formatShortDate(recapSelectedDateISO)}.
+                            Tidak ada setoran masuk pada tanggal ${formattedSelected}.
                         </div>
                     `;
                 } else {
-                    listEl.innerHTML = selectedInfo.items.map(item => `
+                    listEl.innerHTML = dailyRows.map(item => `
                         <div onclick="inspectTransactionDetail('${item.studentId}', ${item.monthId}, '${item.academicYear}')"
                             class="p-3 rounded-2xl bg-white border border-slate-200/80 hover:border-indigo-300 cursor-pointer transition space-y-1">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="text-xs font-bold text-slate-900 truncate">${item.studentName}</span>
-                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${item.kind === 'Tabungan' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}">${item.kind}</span>
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0">${item.studentClass}</span>
                             </div>
-                            <div class="flex items-center justify-between text-[11px]">
-                                <span class="text-slate-500">${item.studentClass} • ${item.monthName}</span>
-                                <span class="font-mono font-extrabold text-slate-900">${formatRupiah(item.nominal)}</span>
+                            <p class="text-[11px] font-semibold text-emerald-700">${item.paymentSummary}</p>
+                            <div class="flex items-center justify-between text-[10px] text-slate-500">
+                                <span>Bulan: ${item.monthName}</span>
+                                <span class="font-mono font-extrabold text-slate-900">${formatRupiah(item.totalOnDate)}</span>
                             </div>
                         </div>
                     `).join('');
                 }
             }
+
+            if (detailTbody && detailTfoot) {
+                if (dailyRows.length === 0) {
+                    detailTbody.innerHTML = `
+                        <tr>
+                            <td colspan="9" class="py-8 text-center text-slate-400 text-xs sm:text-sm">
+                                Tidak ada transaksi pembayaran yang tercatat pada tanggal <strong>${formattedSelected}</strong>. Silakan pilih tanggal bertanda hijau pada kalender di atas.
+                            </td>
+                        </tr>
+                    `;
+                    detailTfoot.innerHTML = '';
+                } else {
+                    detailTbody.innerHTML = dailyRows.map((row, idx) => {
+                        const officerText = row.ttdType === 'stamp' ? row.ttdValue : 'TTD Digital TU';
+                        return `
+                            <tr class="hover:bg-slate-50/90 transition">
+                                <td class="py-3 px-5 text-center font-mono text-xs text-slate-400 font-semibold">${String(idx + 1).padStart(2, '0')}</td>
+                                <td class="py-3 px-5">
+                                    <p class="font-bold text-slate-900">${row.studentName}</p>
+                                    <p class="text-[11px] font-mono text-slate-500">NIS: ${row.studentNis}</p>
+                                </td>
+                                <td class="py-3 px-5">
+                                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">${row.studentClass}</span>
+                                </td>
+                                <td class="py-3 px-5 text-xs font-semibold text-slate-700">${row.monthName} <span class="text-[10px] text-slate-400">(${row.academicYear})</span></td>
+                                <td class="py-3 px-5 text-right font-mono font-bold ${row.tabOnDate > 0 ? 'text-emerald-700' : 'text-slate-300'}">
+                                    ${row.tabOnDate > 0 ? formatRupiah(row.tabOnDate) : '—'}
+                                </td>
+                                <td class="py-3 px-5 text-right font-mono font-bold ${row.sumOnDate > 0 ? 'text-amber-700' : 'text-slate-300'}">
+                                    ${row.sumOnDate > 0 ? formatRupiah(row.sumOnDate) : '—'}
+                                </td>
+                                <td class="py-3 px-5 text-right font-mono font-extrabold text-slate-900">${formatRupiah(row.totalOnDate)}</td>
+                                <td class="py-3 px-5 text-center">
+                                    <span class="inline-flex px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold">${officerText}</span>
+                                </td>
+                                <td class="py-3 px-5 text-right whitespace-nowrap">
+                                    <div class="inline-flex items-center justify-end gap-1.5">
+                                        <button type="button" onclick="openPaymentSlipModal('${row.studentId}', ${row.monthId}, '${row.academicYear}')" title="Cetak Bukti Setoran"
+                                            class="px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold inline-flex items-center gap-1 transition">
+                                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                                            <span>Bukti</span>
+                                        </button>
+                                        <button type="button" onclick="inspectTransactionDetail('${row.studentId}', ${row.monthId}, '${row.academicYear}')"
+                                            class="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition">
+                                            Buku Kas
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    detailTfoot.innerHTML = `
+                        <tr class="bg-slate-900 text-white font-bold text-xs sm:text-sm">
+                            <td colspan="4" class="py-3.5 px-5">TOTAL PENERIMAAN TANGGAL ${formattedSelected.toUpperCase()} (${dailyRows.length} TRANSAKSI)</td>
+                            <td class="py-3.5 px-5 text-right font-mono text-emerald-400">${formatRupiah(dayTabTotal)}</td>
+                            <td class="py-3.5 px-5 text-right font-mono text-amber-400">${formatRupiah(daySumTotal)}</td>
+                            <td class="py-3.5 px-5 text-right font-mono text-base text-white">${formatRupiah(dayGrandTotal)}</td>
+                            <td colspan="2" class="py-3.5 px-5"></td>
+                        </tr>
+                    `;
+                }
+            }
+            safeRefreshIcons();
+        }
+
+        function exportDailyRecapExcel() {
+            const dailyRows = getDailyStudentTransactions(recapSelectedDateISO);
+            if (dailyRows.length === 0) {
+                showToast(`Tidak ada transaksi pada tanggal ${formatShortDate(recapSelectedDateISO)} untuk diekspor.`, 'error');
+                return;
+            }
+            if (typeof XLSX !== 'undefined') {
+                const rows = dailyRows.map((r, idx) => ({
+                    NO: idx + 1,
+                    TANGGAL_SETOR: recapSelectedDateISO,
+                    NIS: r.studentNis,
+                    NAMA_SISWA: r.studentName,
+                    KELAS: r.studentClass,
+                    TAHUN_AJARAN: r.academicYear,
+                    BULAN_TAGIHAN: r.monthName,
+                    TABUNGAN_RP: r.tabOnDate,
+                    SUMBANGAN_SUKARELA_RP: r.sumOnDate,
+                    TOTAL_SETOR_RP: r.totalOnDate,
+                    PETUGAS_TU: r.ttdType === 'stamp' ? r.ttdValue : 'TTD Digital TU'
+                }));
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Transaksi_Harian');
+                XLSX.writeFile(wb, `Rekap_Harian_${recapSelectedDateISO}_SMPN1Tempuran.xlsx`);
+                showToast(`Rincian transaksi tanggal ${formatShortDate(recapSelectedDateISO)} berhasil diekspor.`);
+            } else {
+                exportToCSV();
+            }
+        }
+
+        function printDailyRecapSheet() {
+            const dailyRows = getDailyStudentTransactions(recapSelectedDateISO);
+            const formattedDate = formatShortDate(recapSelectedDateISO);
+            if (dailyRows.length === 0) {
+                showToast(`Tidak ada transaksi pada tanggal ${formattedDate} untuk dicetak.`, 'error');
+                return;
+            }
+
+            let sumTab = 0, sumSumb = 0;
+            const kopLogoHtml = (state && state.customLogoDataUrl)
+                ? `<img src="${state.customLogoDataUrl}" alt="Logo Sekolah" style="width:56px; height:56px; object-fit:contain;">`
+                : '';
+
+            const rowsHtml = dailyRows.map((r, idx) => {
+                sumTab += r.tabOnDate;
+                sumSumb += r.sumOnDate;
+                return `
+                    <tr>
+                        <td style="border:1px solid #334155; padding:6px; text-align:center;">${idx + 1}</td>
+                        <td style="border:1px solid #334155; padding:6px; text-align:center; font-family:monospace;">${r.studentNis}</td>
+                        <td style="border:1px solid #334155; padding:6px; font-weight:bold;">${r.studentName}</td>
+                        <td style="border:1px solid #334155; padding:6px; text-align:center;">${r.studentClass}</td>
+                        <td style="border:1px solid #334155; padding:6px;">${r.monthName}</td>
+                        <td style="border:1px solid #334155; padding:6px; text-align:right;">${formatRupiah(r.tabOnDate)}</td>
+                        <td style="border:1px solid #334155; padding:6px; text-align:right;">${formatRupiah(r.sumOnDate)}</td>
+                        <td style="border:1px solid #334155; padding:6px; text-align:right; font-weight:bold;">${formatRupiah(r.totalOnDate)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const html = `
+                <div style="font-family: Arial, sans-serif; color: #0f172a; padding: 16px;">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:14px; border-bottom: 3px double #0f172a; padding-bottom: 10px; margin-bottom: 16px;">
+                        ${kopLogoHtml}
+                        <div style="text-align:center;">
+                            <h2 style="margin:0; font-size:15px;">PEMERINTAH KABUPATEN MAGELANG • DINAS PENDIDIKAN DAN KEBUDAYAAN</h2>
+                            <h1 style="margin:4px 0; font-size:21px;">SMP NEGERI 1 TEMPURAN</h1>
+                            <p style="margin:0; font-size:12px; font-weight:bold;">RINCIAN PENERIMAAN HARIAN TABUNGAN & SUMBANGAN SUKARELA</p>
+                            <p style="margin:2px 0 0 0; font-size:12px;">Tanggal Transaksi: <strong>${formattedDate}</strong></p>
+                        </div>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; font-size:11.5px;">
+                        <thead>
+                            <tr style="background:#f1f5f9;">
+                                <th style="border:1px solid #334155; padding:6px;">NO</th>
+                                <th style="border:1px solid #334155; padding:6px;">NIS</th>
+                                <th style="border:1px solid #334155; padding:6px;">NAMA SISWA</th>
+                                <th style="border:1px solid #334155; padding:6px;">KELAS</th>
+                                <th style="border:1px solid #334155; padding:6px;">BULAN TAGIHAN</th>
+                                <th style="border:1px solid #334155; padding:6px; text-align:right;">TABUNGAN</th>
+                                <th style="border:1px solid #334155; padding:6px; text-align:right;">SUMBANGAN</th>
+                                <th style="border:1px solid #334155; padding:6px; text-align:right;">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                        <tfoot>
+                            <tr style="background:#f8fafc; font-weight:bold;">
+                                <td colspan="5" style="border:1px solid #334155; padding:7px;">TOTAL PENERIMAAN TANGGAL ${formattedDate.toUpperCase()} (${dailyRows.length} TRANSAKSI)</td>
+                                <td style="border:1px solid #334155; padding:7px; text-align:right;">${formatRupiah(sumTab)}</td>
+                                <td style="border:1px solid #334155; padding:7px; text-align:right;">${formatRupiah(sumSumb)}</td>
+                                <td style="border:1px solid #334155; padding:7px; text-align:right;">${formatRupiah(sumTab + sumSumb)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div style="margin-top:26px; display:flex; justify-content:flex-end; font-size:12px;">
+                        <div style="text-align:center; width:230px;">
+                            <p>Tempuran, ${formattedDate}</p>
+                            <p style="margin-bottom:50px;">Petugas Tata Usaha,</p>
+                            <p style="font-weight:bold; text-decoration:underline;">( ........................................ )</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            triggerSafePrint(html, `Rincian_Harian_${recapSelectedDateISO}_SMPN1Tempuran`);
         }
 
         function computeRecapSummaries() {
