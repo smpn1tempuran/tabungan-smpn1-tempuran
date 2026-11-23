@@ -1850,14 +1850,14 @@
                 }
                 const res = await fetch(FIREBASE_RTDB_URL, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payloadToSend)
                 });
                 if (!res.ok) {
+                    const errBody = await res.text().catch(() => '');
                     if (res.status === 401 || res.status === 403) {
                         updateCloudStatusUI('offline', 'Offline: Rules Firebase Terkunci');
                     } else {
-                        updateCloudStatusUI('offline', `Offline (HTTP ${res.status})`);
+                        updateCloudStatusUI('offline', `Offline (HTTP ${res.status}${errBody ? ': ' + errBody.slice(0, 28) : ''})`);
                     }
                     throw new Error('HTTP ' + res.status);
                 }
@@ -1889,15 +1889,13 @@
         async function pullStateFromCloud(initialBoot = false) {
             if (isCloudSyncing) return;
             try {
-                const res = await fetch(FIREBASE_RTDB_URL, {
-                    method: 'GET',
-                    cache: 'no-store'
-                });
+                const res = await fetch(FIREBASE_RTDB_URL);
                 if (!res.ok) {
+                    const errBody = await res.text().catch(() => '');
                     if (res.status === 401 || res.status === 403) {
                         updateCloudStatusUI('offline', 'Offline: Rules Firebase Terkunci');
                     } else {
-                        updateCloudStatusUI('offline', `Offline (HTTP ${res.status})`);
+                        updateCloudStatusUI('offline', `Offline (HTTP ${res.status}${errBody ? ': ' + errBody.slice(0, 28) : ''})`);
                     }
                     throw new Error('HTTP ' + res.status);
                 }
