@@ -271,6 +271,11 @@
                     <i data-lucide="shield-user" class="w-4 h-4"></i>
                     <span>Manajemen Pengguna</span>
                 </button>
+                <button type="button" id="nav-btn-homeroom" onclick="switchPage('homeroom')"
+                    class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-sm transition">
+                    <i data-lucide="user-check" class="w-4 h-4"></i>
+                    <span>Database Wali Kelas</span>
+                </button>
             </nav>
         </div>
 
@@ -299,6 +304,10 @@
                 <select id="sidebar-ay-select" onchange="handleAcademicYearChange(this.value)"
                     class="w-full px-2.5 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
                 </select>
+                <div id="cloud-sync-indicator" class="flex items-center gap-1.5 pt-1 text-[10px] font-semibold text-emerald-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Sinkronisasi Cloud Aktif</span>
+                </div>
                 <p class="text-[10px] text-slate-300 leading-snug pt-0.5">aplikasi ini dikembangkan oleh <span class="font-bold text-emerald-400">Mas Operator Temp1</span></p>
             </div>
         </div>
@@ -872,7 +881,7 @@
                     </div>
                     <select id="master-class-filter" onchange="renderMasterStudentsTable()"
                         class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                        <option value="">Semua Kelas (7A - 9F)</option>
+                        <option value="">Semua Kelas (7A - 9G)</option>
                     </select>
                 </div>
 
@@ -1100,7 +1109,7 @@
 
                     <div id="report-class-selector-box">
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Pilih Kelas</label>
-                        <select id="report-class-select" onchange="renderOfficialReportPreview()"
+                        <select id="report-class-select" onchange="handleReportClassChange()"
                             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
                         </select>
                     </div>
@@ -1220,6 +1229,78 @@
                             <span>Reset Default</span>
                         </button>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================
+             HALAMAN 9: DATABASE WALI KELAS (7A-7G, 8A-8G, 9A-9G) - ADMIN
+             ========================================================= -->
+        <section id="page-homeroom" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Database Wali Kelas & Rombel</h2>
+                        <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">Khusus Admin</span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Kelola daftar kelas, tambah atau hapus rombel, serta edit dan simpan Nama & NIP Wali Kelas.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="openHomeroomModal()"
+                        class="px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm transition">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                        <span>+ Tambah Kelas</span>
+                    </button>
+                    <button type="button" onclick="exportHomeroomExcel()"
+                        class="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-2xs transition">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+                        <span>Ekspor Excel</span>
+                    </button>
+                    <button type="button" onclick="saveAllHomeroomTeachers()"
+                        class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm transition">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        <span>Simpan Semua</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Jenjang & Pencarian Cepat Wali Kelas -->
+            <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-soft border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="inline-flex flex-wrap p-1 rounded-xl bg-slate-100 text-xs font-bold self-start">
+                    <button type="button" id="hr-tab-all" onclick="setHomeroomGradeFilter('all')"
+                        class="px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-2xs transition">Semua Kelas</button>
+                    <button type="button" id="hr-tab-7" onclick="setHomeroomGradeFilter('7')"
+                        class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Tingkat 7</button>
+                    <button type="button" id="hr-tab-8" onclick="setHomeroomGradeFilter('8')"
+                        class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Tingkat 8</button>
+                    <button type="button" id="hr-tab-9" onclick="setHomeroomGradeFilter('9')"
+                        class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Tingkat 9</button>
+                </div>
+
+                <div class="relative w-full sm:w-72">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" id="homeroom-search-input" oninput="renderHomeroomTable()"
+                        placeholder="Cari kelas, nama wali kelas, atau NIP..."
+                        class="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+            </div>
+
+            <!-- Tabel Database Wali Kelas -->
+            <div class="bg-white rounded-3xl shadow-soft border border-slate-200/80 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-3.5 px-5 w-14 text-center">No</th>
+                                <th class="py-3.5 px-5 w-32">Kelas</th>
+                                <th class="py-3.5 px-5 w-28 text-center">Jml Siswa</th>
+                                <th class="py-3.5 px-5">Nama Lengkap & Gelar Wali Kelas</th>
+                                <th class="py-3.5 px-5 w-52">NIP Wali Kelas</th>
+                                <th class="py-3.5 px-5 w-52 text-right">Menu Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="homeroom-teachers-tbody" class="divide-y divide-slate-100"></tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -1522,6 +1603,81 @@
     </div>
 
     <!-- =========================================================
+         MODAL: TAMBAH / EDIT KELAS & WALI KELAS (ADMIN ONLY)
+         ========================================================= -->
+    <div id="homeroom-class-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+            <div class="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                <div>
+                    <h3 id="homeroom-modal-title" class="font-extrabold text-lg text-slate-900">Tambah Kelas Baru</h3>
+                    <p id="homeroom-modal-subtitle" class="text-xs text-slate-500">Daftarkan rombel kelas baru beserta Wali Kelasnya</p>
+                </div>
+                <button type="button" onclick="closeHomeroomModal()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-200/70">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="handleSaveHomeroomModal(event)" class="p-5 sm:p-6 space-y-4">
+                <input type="hidden" id="input-edit-homeroom-old-class" value="">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Nama Kelas / Rombel</label>
+                    <input type="text" id="input-homeroom-class-name" required placeholder="Contoh: Kelas 7H atau Kelas 8H"
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <p class="text-[11px] text-slate-500 mt-1">Gunakan awalan "Kelas ", misalnya: Kelas 7H, Kelas 8H, Kelas 9H.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Nama Lengkap & Gelar Wali Kelas</label>
+                    <input type="text" id="input-homeroom-teacher-name" required placeholder="Contoh: Drs. BAMBANG SUDARSONO, M.Pd."
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">NIP Wali Kelas</label>
+                    <input type="text" id="input-homeroom-teacher-nip" placeholder="Contoh: 19780412 200501 1 003 (atau -)"
+                        class="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                    <button type="button" onclick="closeHomeroomModal()"
+                        class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold">
+                        Batal
+                    </button>
+                    <button type="submit"
+                        class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-sm">
+                        Simpan Data Kelas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL: KONFIRMASI HAPUS KELAS
+         ========================================================= -->
+    <div id="delete-homeroom-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden p-6 space-y-4">
+            <div class="flex items-start gap-4">
+                <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-base text-slate-900">Hapus Kelas dari Database?</h3>
+                    <p id="delete-homeroom-confirm-text" class="text-xs text-slate-600 mt-1 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus kelas ini beserta data Wali Kelasnya?
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeDeleteHomeroomModal()"
+                    class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold">
+                    Batal
+                </button>
+                <button type="button" onclick="confirmDeleteHomeroomClass()"
+                    class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-bold shadow-sm">
+                    Ya, Hapus Kelas
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
          MODAL: TAMBAH / EDIT SISWA MANUAL
          ========================================================= -->
     <div id="add-student-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 no-print">
@@ -1547,11 +1703,7 @@
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Kelas</label>
                         <input type="text" id="input-new-class" list="class-suggestions" required placeholder="Contoh: Kelas 7F"
                             class="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                        <datalist id="class-suggestions">
-                            <option value="Kelas 7A"></option><option value="Kelas 7B"></option><option value="Kelas 7C"></option><option value="Kelas 7D"></option><option value="Kelas 7E"></option><option value="Kelas 7F"></option>
-                            <option value="Kelas 8A"></option><option value="Kelas 8B"></option><option value="Kelas 8C"></option><option value="Kelas 8D"></option><option value="Kelas 8E"></option><option value="Kelas 8F"></option>
-                            <option value="Kelas 9A"></option><option value="Kelas 9B"></option><option value="Kelas 9C"></option><option value="Kelas 9D"></option><option value="Kelas 9E"></option><option value="Kelas 9F"></option>
-                        </datalist>
+                        <datalist id="class-suggestions"></datalist>
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Nomor Induk (NIS)</label>
@@ -1734,6 +1886,100 @@
 
     <!-- Container khusus cetak fallback -->
     <div id="print-report-sheet" class="hidden"></div>
+
+    <!-- =========================================================
+         SINKRONISASI CLOUD REAL-TIME (FIREBASE)
+         ========================================================= -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.cloudSync = {
+            enabled: false,
+            ready: false,
+            pushState: null
+        };
+
+        async function initRealtimeCloudStorage() {
+            const indicator = document.getElementById('cloud-sync-indicator');
+            try {
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    if (indicator) {
+                        indicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-200">Mode Offline Lokal</span>`;
+                    }
+                    return;
+                }
+
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'smpn1-tempuran-tabungan';
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                const user = auth.currentUser;
+                if (!user) return;
+
+                const sharedDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'smpn1_tempuran_state', 'master_db');
+                let isApplyingRemote = false;
+
+                window.cloudSync.enabled = true;
+                window.cloudSync.pushState = async (currentState) => {
+                    if (!auth.currentUser || isApplyingRemote) return;
+                    try {
+                        const { currentUserId, activeStudentId, ...sharedPayload } = currentState;
+                        await setDoc(sharedDocRef, {
+                            payloadJson: JSON.stringify(sharedPayload),
+                            updatedAt: new Date().toISOString()
+                        }, { merge: true });
+                    } catch (err) {
+                        console.error('Gagal mengirim pembaruan ke cloud:', err);
+                    }
+                };
+
+                onSnapshot(sharedDocRef, (snap) => {
+                    if (!auth.currentUser) return;
+                    if (snap.exists() && snap.data().payloadJson) {
+                        try {
+                            const remoteData = JSON.parse(snap.data().payloadJson);
+                            isApplyingRemote = true;
+                            if (typeof window.applyRemoteCloudState === 'function') {
+                                window.applyRemoteCloudState(remoteData);
+                            }
+                        } catch (parseErr) {
+                            console.error('Gagal memproses data cloud:', parseErr);
+                        } finally {
+                            setTimeout(() => { isApplyingRemote = false; }, 150);
+                        }
+                    } else if (window.state) {
+                        window.cloudSync.pushState(window.state);
+                    }
+
+                    window.cloudSync.ready = true;
+                    if (indicator) {
+                        indicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-emerald-300">Online • Tersinkronisasi</span>`;
+                    }
+                }, (err) => {
+                    console.error('Error listener cloud:', err);
+                    if (indicator) {
+                        indicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400"></span><span class="text-rose-200">Koneksi Cloud Terputus</span>`;
+                    }
+                });
+            } catch (e) {
+                console.warn('Inisialisasi cloud storage dilewati:', e);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initRealtimeCloudStorage();
+        });
+    </script>
 
     <!-- =========================================================
          JAVASCRIPT LOGIKA APLIKASI
@@ -2129,6 +2375,29 @@
             activeAcademicYear: '2026/2027',
             currentUserId: null,
             customLogoDataUrl: null,
+            homeroomTeachers: {
+                'Kelas 7A': { name: 'Drs. AHMAD FAUZAN', nip: '19700412 199802 1 001' },
+                'Kelas 7B': { name: 'ENDANG SULISTYOWATI, S.Pd.', nip: '19750819 200501 2 004' },
+                'Kelas 7C': { name: 'BAMBANG HERMAWAN, S.Pd.', nip: '19791103 200604 1 007' },
+                'Kelas 7D': { name: 'RETNO WULANDARI, S.Pd.', nip: '19830214 200902 2 008' },
+                'Kelas 7E': { name: 'AGUS SETIAWAN, S.Pd.', nip: '19840621 201001 1 012' },
+                'Kelas 7F': { name: 'SITI AMINAH, S.Pd.', nip: '19820315 200902 2 005' },
+                'Kelas 7G': { name: 'NURUL HIDAYAH, S.Pd.I.', nip: '19860910 201402 2 003' },
+                'Kelas 8A': { name: 'SRI WAHYUNI, S.Pd.', nip: '19740511 200312 2 002' },
+                'Kelas 8B': { name: 'EKO PRASETYO, S.Pd.', nip: '19800125 200801 1 009' },
+                'Kelas 8C': { name: 'DEWI KURNIAWATI, S.Pd.', nip: '19850717 201101 2 011' },
+                'Kelas 8D': { name: 'HENDRA KUSUMA, S.Pd.', nip: '19870304 201402 1 002' },
+                'Kelas 8E': { name: 'TRI HANDAYANI, S.Pd.', nip: '19811230 200902 2 006' },
+                'Kelas 8F': { name: 'MUHAMMAD RIDWAN, S.Pd.', nip: '19881014 201502 1 001' },
+                'Kelas 8G': { name: 'FITRIANI RAHMAWATI, S.Pd.', nip: '19900422 201903 2 007' },
+                'Kelas 9A': { name: 'Dra. Hj. SITI NURJANAH', nip: '19670908 199403 2 004' },
+                'Kelas 9B': { name: 'SUGENG RIYADI, S.Pd., M.Pd.', nip: '19720218 199903 1 005' },
+                'Kelas 9C': { name: 'RINA MARLINA, S.Pd.', nip: '19780612 200604 2 014' },
+                'Kelas 9D': { name: 'DWI HARTONO, S.Pd.', nip: '19810905 200801 1 010' },
+                'Kelas 9E': { name: 'YUNI ASTUTI, S.Pd.', nip: '19841128 201001 2 016' },
+                'Kelas 9F': { name: 'ARIF WICAKSONO, S.Pd.', nip: '19870815 201402 1 004' },
+                'Kelas 9G': { name: 'LESTARI NINGSIH, S.Pd.', nip: '19890119 201903 2 005' }
+            },
             users: [
                 {
                     id: 'usr-admin-1',
@@ -2308,13 +2577,38 @@
             return state.students.find(s => s.id === state.activeStudentId) || state.students[0];
         }
 
-        function saveState() {
+        function saveState(skipCloudPush = false) {
             try {
+                window.state = state;
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                if (!skipCloudPush && window.cloudSync && window.cloudSync.enabled && typeof window.cloudSync.pushState === 'function') {
+                    window.cloudSync.pushState(state);
+                }
             } catch (err) {
-                console.warn('Gagal menyimpan state ke localStorage:', err);
+                console.warn('Gagal menyimpan state:', err);
             }
         }
+
+        window.applyRemoteCloudState = function(remoteData) {
+            if (!remoteData || !Array.isArray(remoteData.students) || remoteData.students.length === 0) return;
+            const preservedUserId = state ? state.currentUserId : null;
+            const preservedStudentId = state ? state.activeStudentId : null;
+            const preservedAy = state ? state.activeAcademicYear : (remoteData.activeAcademicYear || '2026/2027');
+
+            state = {
+                ...remoteData,
+                currentUserId: preservedUserId,
+                activeStudentId: remoteData.students.some(s => s.id === preservedStudentId)
+                    ? preservedStudentId
+                    : remoteData.students[0].id,
+                activeAcademicYear: preservedAy
+            };
+            window.state = state;
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {}
+            renderAll();
+        };
 
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -2353,6 +2647,9 @@
                         if (!Array.isArray(parsed.users) || parsed.users.length === 0) {
                             parsed.users = JSON.parse(JSON.stringify(INITIAL_STATE.users));
                         }
+                        if (!parsed.homeroomTeachers || typeof parsed.homeroomTeachers !== 'object') {
+                            parsed.homeroomTeachers = JSON.parse(JSON.stringify(INITIAL_STATE.homeroomTeachers));
+                        }
                         parsed.students.forEach(s => {
                             if (!s.yearlyRecords) {
                                 s.yearlyRecords = {};
@@ -2362,6 +2659,7 @@
                             }
                         });
                         state = parsed;
+                        window.state = state;
                         return;
                     }
                 }
@@ -2369,7 +2667,8 @@
                 console.warn('Gagal membaca storage:', err);
             }
             state = JSON.parse(JSON.stringify(INITIAL_STATE));
-            saveState();
+            window.state = state;
+            saveState(true);
         }
 
         // ==========================================
@@ -2459,12 +2758,14 @@
             // Tampilkan/sembunyikan menu & tombol khusus Admin
             const navBackup = document.getElementById('nav-btn-backup');
             const navUsers = document.getElementById('nav-btn-users');
+            const navHomeroom = document.getElementById('nav-btn-homeroom');
             const studentsToolbar = document.getElementById('students-admin-toolbar');
             const operatorBanner = document.getElementById('operator-role-banner');
             const adminLogoCard = document.getElementById('admin-logo-settings-card');
 
             if (navBackup) navBackup.classList.toggle('hidden', !isAdmin);
             if (navUsers) navUsers.classList.toggle('hidden', !isAdmin);
+            if (navHomeroom) navHomeroom.classList.toggle('hidden', !isAdmin);
             if (studentsToolbar) studentsToolbar.classList.toggle('hidden', !isAdmin);
             if (operatorBanner) operatorBanner.classList.toggle('hidden', isAdmin);
             if (adminLogoCard) adminLogoCard.classList.toggle('hidden', !isAdmin);
@@ -2617,12 +2918,12 @@
         }
 
         function switchPage(pageName) {
-            if ((pageName === 'backup' || pageName === 'users') && !isAdminUser()) {
+            if ((pageName === 'backup' || pageName === 'users' || pageName === 'homeroom') && !isAdminUser()) {
                 showToast('Akses ditolak. Menu ini hanya tersedia untuk akun Administrator.', 'error');
                 return;
             }
 
-            const pages = ['ledger', 'dashboard', 'students', 'history', 'recap', 'backup', 'reports', 'users'];
+            const pages = ['ledger', 'dashboard', 'students', 'history', 'recap', 'backup', 'reports', 'users', 'homeroom'];
             pages.forEach(p => {
                 const el = document.getElementById(`page-${p}`);
                 const navBtn = document.getElementById(`nav-btn-${p}`);
@@ -2650,6 +2951,8 @@
                 renderOfficialReportPage();
             } else if (pageName === 'users') {
                 renderUsersManagementTable();
+            } else if (pageName === 'homeroom') {
+                renderHomeroomTable();
             } else {
                 renderStudentLedger();
             }
@@ -3405,11 +3708,33 @@
         // ==========================================
         // DATA MASTER SISWA: TEMPLATE, IMPOR, EKSPOR, TAMBAH, EDIT & HAPUS
         // ==========================================
-        const STANDARD_CLASSES = [
-            'Kelas 7A', 'Kelas 7B', 'Kelas 7C', 'Kelas 7D', 'Kelas 7E', 'Kelas 7F',
-            'Kelas 8A', 'Kelas 8B', 'Kelas 8C', 'Kelas 8D', 'Kelas 8E', 'Kelas 8F',
-            'Kelas 9A', 'Kelas 9B', 'Kelas 9C', 'Kelas 9D', 'Kelas 9E', 'Kelas 9F'
+        const DEFAULT_STANDARD_CLASSES = [
+            'Kelas 7A', 'Kelas 7B', 'Kelas 7C', 'Kelas 7D', 'Kelas 7E', 'Kelas 7F', 'Kelas 7G',
+            'Kelas 8A', 'Kelas 8B', 'Kelas 8C', 'Kelas 8D', 'Kelas 8E', 'Kelas 8F', 'Kelas 8G',
+            'Kelas 9A', 'Kelas 9B', 'Kelas 9C', 'Kelas 9D', 'Kelas 9E', 'Kelas 9F', 'Kelas 9G'
         ];
+
+        function getManagedClassesList() {
+            const set = new Set();
+            if (state && state.homeroomTeachers && Object.keys(state.homeroomTeachers).length > 0) {
+                Object.keys(state.homeroomTeachers).forEach(c => set.add(c));
+            } else {
+                DEFAULT_STANDARD_CLASSES.forEach(c => set.add(c));
+            }
+            if (state && Array.isArray(state.students)) {
+                state.students.forEach(s => {
+                    if (s.className) set.add(s.className);
+                });
+            }
+            return Array.from(set).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+        }
+
+        function refreshClassSuggestionsDatalist() {
+            const dl = document.getElementById('class-suggestions');
+            if (!dl) return;
+            const classes = getManagedClassesList();
+            dl.innerHTML = classes.map(c => `<option value="${c}"></option>`).join('');
+        }
 
         function toggleTemplateMenu(forceState) {
             const menu = document.getElementById('template-dropdown-menu');
@@ -3791,11 +4116,12 @@
             const activeAy = getActiveAcademicYear();
             const savedClass = classSelect ? classSelect.value : '';
             if (classSelect) {
-                const allClasses = new Set([...STANDARD_CLASSES, ...state.students.map(s => s.className)]);
-                classSelect.innerHTML = '<option value="">Semua Kelas (7A - 9F)</option>' +
-                    Array.from(allClasses).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+                const allClasses = getManagedClassesList();
+                classSelect.innerHTML = '<option value="">Semua Kelas</option>' +
+                    allClasses.map(c => `<option value="${c}">${c}</option>`).join('');
                 classSelect.value = savedClass;
             }
+            refreshClassSuggestionsDatalist();
 
             const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
             const clsFilter = classSelect ? classSelect.value : '';
@@ -3921,9 +4247,9 @@
             const months = getMonthsForAcademicYear(activeAy);
 
             const savedClass = classSelect.value;
-            const allClasses = new Set([...STANDARD_CLASSES, ...state.students.map(s => s.className)]);
+            const allClasses = getManagedClassesList();
             classSelect.innerHTML = '<option value="">Semua Kelas</option>' +
-                Array.from(allClasses).sort().map(c => `<option value="${c}">${c}</option>`).join('');
+                allClasses.map(c => `<option value="${c}">${c}</option>`).join('');
             classSelect.value = savedClass;
 
             const savedMonth = monthSelect.value;
@@ -4554,21 +4880,40 @@
             if (!classSelect) return;
 
             const savedVal = classSelect.value;
-            const allClasses = new Set([...STANDARD_CLASSES, ...state.students.map(s => s.className)]);
-            classSelect.innerHTML = Array.from(allClasses).sort().map(cls =>
+            const allClasses = getManagedClassesList();
+            classSelect.innerHTML = allClasses.map(cls =>
                 `<option value="${cls}">${cls}</option>`
             ).join('');
 
-            if (savedVal && Array.from(allClasses).includes(savedVal)) {
+            if (savedVal && allClasses.includes(savedVal)) {
                 classSelect.value = savedVal;
             } else {
                 const activeStd = getActiveStudent();
-                if (activeStd && activeStd.className) {
+                if (activeStd && activeStd.className && allClasses.includes(activeStd.className)) {
                     classSelect.value = activeStd.className;
                 }
             }
 
             handleReportConfigChange();
+        }
+
+        function syncHomeroomSignerToReport() {
+            const targetType = document.getElementById('report-target-type').value;
+            if (targetType !== 'walikelas') return;
+            const selectedClass = document.getElementById('report-class-select').value || 'Kelas 7F';
+            const hrMap = (state && state.homeroomTeachers) ? state.homeroomTeachers : {};
+            const hrData = hrMap[selectedClass];
+            const secondInput = document.getElementById('report-second-signer-name');
+            const secondNipInput = document.getElementById('report-second-signer-nip');
+            if (hrData) {
+                if (secondInput) secondInput.value = hrData.name || '';
+                if (secondNipInput) secondNipInput.value = hrData.nip || '-';
+            }
+        }
+
+        function handleReportClassChange() {
+            syncHomeroomSignerToReport();
+            renderOfficialReportPreview();
         }
 
         function handleReportConfigChange() {
@@ -4580,9 +4925,7 @@
             if (targetType === 'walikelas') {
                 classBox.classList.remove('hidden');
                 secondLabel.textContent = 'Nama Wali Kelas';
-                if (secondInput.value.includes('BENDAHARA')) {
-                    secondInput.value = 'SITI AMINAH, S.Pd.';
-                }
+                syncHomeroomSignerToReport();
             } else if (targetType === 'kepsek') {
                 classBox.classList.add('hidden');
                 secondLabel.textContent = 'Nama Bendahara Sekolah';
@@ -4854,43 +5197,363 @@
         }
 
         // ==========================================
-        // MANAJEMEN AKUN PENGGUNA (KHUSUS ADMIN)
+        // DATABASE WALI KELAS & ROMBEL (TAMBAH, EDIT, SIMPAN, HAPUS) - KHUSUS ADMIN
+        // ==========================================
+        let homeroomGradeFilter = 'all';
+        let pendingDeleteHomeroomClass = null;
+
+        function setHomeroomGradeFilter(grade) {
+            homeroomGradeFilter = grade;
+            ['all', '7', '8', '9'].forEach(g => {
+                const btn = document.getElementById(`hr-tab-${g}`);
+                if (!btn) return;
+                if (g === grade) {
+                    btn.className = 'px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-2xs transition';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+                }
+            });
+            renderHomeroomTable();
+        }
+
+        function renderHomeroomTable() {
+            const tbody = document.getElementById('homeroom-teachers-tbody');
+            if (!tbody) return;
+
+            if (!state.homeroomTeachers) {
+                state.homeroomTeachers = JSON.parse(JSON.stringify(INITIAL_STATE.homeroomTeachers));
+            }
+
+            const searchVal = (document.getElementById('homeroom-search-input')?.value || '').trim().toLowerCase();
+            const classKeys = Object.keys(state.homeroomTeachers).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+
+            const filteredClasses = classKeys.filter(cls => {
+                if (homeroomGradeFilter !== 'all' && !cls.toLowerCase().startsWith(`kelas ${homeroomGradeFilter}`)) {
+                    return false;
+                }
+                const info = state.homeroomTeachers[cls] || { name: '', nip: '' };
+                if (!searchVal) return true;
+                return cls.toLowerCase().includes(searchVal) ||
+                    (info.name || '').toLowerCase().includes(searchVal) ||
+                    (info.nip || '').toLowerCase().includes(searchVal);
+            });
+
+            if (filteredClasses.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="py-10 text-center text-slate-400 text-sm">
+                            Data kelas / wali kelas tidak ditemukan. Klik "+ Tambah Kelas" untuk menambahkan rombel baru.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filteredClasses.map((cls, idx) => {
+                const info = state.homeroomTeachers[cls] || { name: '', nip: '' };
+                const safeId = cls.replace(/[^a-zA-Z0-9]/g, '_');
+                const studentCount = state.students.filter(s => s.className === cls).length;
+
+                let gradeBadgeCls = 'bg-sky-50 text-sky-700 border-sky-200';
+                if (/kelas\s*8/i.test(cls)) gradeBadgeCls = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                else if (/kelas\s*9/i.test(cls)) gradeBadgeCls = 'bg-amber-50 text-amber-800 border-amber-200';
+                else if (!/kelas\s*7/i.test(cls)) gradeBadgeCls = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+
+                const escapedCls = cls.replace(/'/g, "\\'");
+
+                return `
+                    <tr class="hover:bg-slate-50/90 transition">
+                        <td class="py-3 px-5 text-center font-mono text-xs text-slate-400 font-semibold">${String(idx + 1).padStart(2, '0')}</td>
+                        <td class="py-3 px-5">
+                            <span class="inline-flex px-2.5 py-1 rounded-lg border text-xs font-extrabold ${gradeBadgeCls}">${cls}</span>
+                        </td>
+                        <td class="py-3 px-5 text-center">
+                            <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">${studentCount} Siswa</span>
+                        </td>
+                        <td class="py-3 px-5">
+                            <input type="text" id="hr-name-${safeId}" value="${(info.name || '').replace(/"/g, '&quot;')}"
+                                placeholder="Masukkan Nama Lengkap & Gelar Wali Kelas..."
+                                class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                        </td>
+                        <td class="py-3 px-5">
+                            <input type="text" id="hr-nip-${safeId}" value="${(info.nip || '').replace(/"/g, '&quot;')}"
+                                placeholder="NIP / -"
+                                class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:border-emerald-500 font-mono text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                        </td>
+                        <td class="py-3 px-5 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center justify-end gap-1.5">
+                                <button type="button" onclick="saveSingleHomeroomTeacher('${escapedCls}')" title="Simpan Perubahan Baris Ini"
+                                    class="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white text-xs font-bold border border-emerald-200 hover:border-emerald-600 inline-flex items-center gap-1 transition">
+                                    <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                                    <span>Simpan</span>
+                                </button>
+                                <button type="button" onclick="openHomeroomModal('${escapedCls}')" title="Edit Kelas & Wali Kelas"
+                                    class="p-1.5 rounded-xl border border-slate-200 hover:bg-indigo-50 hover:border-indigo-300 text-slate-600 hover:text-indigo-700 transition">
+                                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button type="button" onclick="openDeleteHomeroomModal('${escapedCls}')" title="Hapus Kelas"
+                                    class="p-1.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 transition">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            safeRefreshIcons();
+        }
+
+        function openHomeroomModal(editClassName = null) {
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat menambah atau mengedit kelas.', 'error');
+                return;
+            }
+            const modal = document.getElementById('homeroom-class-modal');
+            const titleEl = document.getElementById('homeroom-modal-title');
+            const subEl = document.getElementById('homeroom-modal-subtitle');
+            const oldClassInput = document.getElementById('input-edit-homeroom-old-class');
+            const classInput = document.getElementById('input-homeroom-class-name');
+            const nameInput = document.getElementById('input-homeroom-teacher-name');
+            const nipInput = document.getElementById('input-homeroom-teacher-nip');
+
+            if (editClassName && state.homeroomTeachers && state.homeroomTeachers[editClassName]) {
+                const info = state.homeroomTeachers[editClassName];
+                const safeId = editClassName.replace(/[^a-zA-Z0-9]/g, '_');
+                const liveName = document.getElementById(`hr-name-${safeId}`)?.value ?? info.name;
+                const liveNip = document.getElementById(`hr-nip-${safeId}`)?.value ?? info.nip;
+
+                titleEl.textContent = `Edit ${editClassName}`;
+                subEl.textContent = 'Ubah nama kelas/rombel, nama wali kelas, atau NIP';
+                oldClassInput.value = editClassName;
+                classInput.value = editClassName;
+                nameInput.value = liveName || '';
+                nipInput.value = liveNip || '';
+            } else {
+                titleEl.textContent = 'Tambah Kelas Baru';
+                subEl.textContent = 'Daftarkan rombel kelas baru beserta Wali Kelasnya';
+                oldClassInput.value = '';
+                classInput.value = '';
+                nameInput.value = '';
+                nipInput.value = '';
+            }
+
+            modal.classList.remove('hidden');
+            safeRefreshIcons();
+        }
+
+        function closeHomeroomModal() {
+            document.getElementById('homeroom-class-modal').classList.add('hidden');
+        }
+
+        function handleSaveHomeroomModal(e) {
+            e.preventDefault();
+            if (!isAdminUser()) return;
+
+            const oldClassName = document.getElementById('input-edit-homeroom-old-class').value.trim();
+            let newClassName = document.getElementById('input-homeroom-class-name').value.trim();
+            const teacherName = document.getElementById('input-homeroom-teacher-name').value.trim();
+            const teacherNip = document.getElementById('input-homeroom-teacher-nip').value.trim() || '-';
+
+            if (!newClassName || !teacherName) {
+                showToast('Nama Kelas dan Nama Wali Kelas wajib diisi.', 'error');
+                return;
+            }
+            if (!/^kelas\s+/i.test(newClassName)) {
+                newClassName = 'Kelas ' + newClassName;
+            }
+
+            if (!state.homeroomTeachers) state.homeroomTeachers = {};
+
+            const duplicateKey = Object.keys(state.homeroomTeachers).find(
+                k => k.toLowerCase() === newClassName.toLowerCase() && k !== oldClassName
+            );
+            if (duplicateKey) {
+                showToast(`Kelas "${duplicateKey}" sudah ada di database.`, 'error');
+                return;
+            }
+
+            if (oldClassName) {
+                if (oldClassName !== newClassName) {
+                    delete state.homeroomTeachers[oldClassName];
+                    // Perbarui nama kelas pada siswa yang tergabung di kelas lama
+                    state.students.forEach(s => {
+                        if (s.className === oldClassName) {
+                            s.className = newClassName;
+                        }
+                    });
+                }
+                state.homeroomTeachers[newClassName] = { name: teacherName, nip: teacherNip };
+                showToast(`Data ${newClassName} berhasil diperbarui.`);
+            } else {
+                state.homeroomTeachers[newClassName] = { name: teacherName, nip: teacherNip };
+                showToast(`Kelas baru ${newClassName} berhasil ditambahkan.`);
+            }
+
+            saveState();
+            renderAll();
+            closeHomeroomModal();
+        }
+
+        function openDeleteHomeroomModal(className) {
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat menghapus kelas.', 'error');
+                return;
+            }
+            const totalClasses = Object.keys(state.homeroomTeachers || {}).length;
+            if (totalClasses <= 1) {
+                showToast('Minimal harus tersisa 1 kelas di dalam database.', 'error');
+                return;
+            }
+
+            const studentCount = state.students.filter(s => s.className === className).length;
+            pendingDeleteHomeroomClass = className;
+
+            const descEl = document.getElementById('delete-homeroom-confirm-text');
+            if (studentCount > 0) {
+                descEl.textContent = `Kelas "${className}" masih memiliki ${studentCount} siswa terdaftar. Jika dihapus dari daftar Wali Kelas, data siswa tetap aman namun perlu dipindahkan kelasnya. Lanjutkan hapus "${className}"?`;
+            } else {
+                descEl.textContent = `Apakah Anda yakin ingin menghapus "${className}" beserta data Wali Kelasnya dari database?`;
+            }
+
+            document.getElementById('delete-homeroom-modal').classList.remove('hidden');
+            safeRefreshIcons();
+        }
+
+        function closeDeleteHomeroomModal() {
+            pendingDeleteHomeroomClass = null;
+            document.getElementById('delete-homeroom-modal').classList.add('hidden');
+        }
+
+        function confirmDeleteHomeroomClass() {
+            if (!isAdminUser() || !pendingDeleteHomeroomClass) return;
+            const target = pendingDeleteHomeroomClass;
+            if (state.homeroomTeachers && state.homeroomTeachers[target]) {
+                delete state.homeroomTeachers[target];
+                saveState();
+                renderAll();
+                showToast(`Kelas "${target}" telah dihapus dari database.`);
+            }
+            closeDeleteHomeroomModal();
+        }
+
+        function saveSingleHomeroomTeacher(className) {
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat mengubah data Wali Kelas.', 'error');
+                return;
+            }
+            const safeId = className.replace(/[^a-zA-Z0-9]/g, '_');
+            const nameEl = document.getElementById(`hr-name-${safeId}`);
+            const nipEl = document.getElementById(`hr-nip-${safeId}`);
+            if (!nameEl || !nipEl) return;
+
+            if (!state.homeroomTeachers) state.homeroomTeachers = {};
+            state.homeroomTeachers[className] = {
+                name: nameEl.value.trim(),
+                nip: nipEl.value.trim() || '-'
+            };
+            saveState();
+            renderOfficialReportPage();
+            showToast(`Wali Kelas ${className} berhasil disimpan.`);
+        }
+
+        function saveAllHomeroomTeachers() {
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat mengubah data Wali Kelas.', 'error');
+                return;
+            }
+            if (!state.homeroomTeachers) state.homeroomTeachers = {};
+            let updatedCount = 0;
+
+            Object.keys(state.homeroomTeachers).forEach(cls => {
+                const safeId = cls.replace(/[^a-zA-Z0-9]/g, '_');
+                const nameEl = document.getElementById(`hr-name-${safeId}`);
+                const nipEl = document.getElementById(`hr-nip-${safeId}`);
+                if (nameEl && nipEl) {
+                    state.homeroomTeachers[cls] = {
+                        name: nameEl.value.trim(),
+                        nip: nipEl.value.trim() || '-'
+                    };
+                    updatedCount++;
+                }
+            });
+
+            saveState();
+            renderOfficialReportPage();
+            showToast(`Berhasil menyimpan ${updatedCount} data Wali Kelas.`);
+        }
+
+        function exportHomeroomExcel() {
+            if (!state.homeroomTeachers) state.homeroomTeachers = {};
+            const classKeys = Object.keys(state.homeroomTeachers).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+            const rows = classKeys.map((cls, idx) => {
+                const info = state.homeroomTeachers[cls] || { name: '', nip: '-' };
+                const studentCount = state.students.filter(s => s.className === cls).length;
+                return {
+                    NO: idx + 1,
+                    KELAS: cls,
+                    JUMLAH_SISWA: studentCount,
+                    NAMA_WALI_KELAS: info.name || '-',
+                    NIP: info.nip || '-'
+                };
+            });
+
+            if (typeof XLSX !== 'undefined') {
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Database_Wali_Kelas');
+                XLSX.writeFile(wb, 'Database_Wali_Kelas_SMPN1Tempuran.xlsx');
+                showToast('Database Wali Kelas berhasil diekspor ke Excel.');
+            } else {
+                showToast('Library Excel belum siap.', 'error');
+            }
+        }
+
+        // ==========================================
+        // MANAJEMEN PENGGUNA & HAK AKSES (ADMIN ONLY)
         // ==========================================
         function renderUsersManagementTable() {
             const tbody = document.getElementById('users-management-tbody');
             if (!tbody) return;
 
+            if (!Array.isArray(state.users)) {
+                state.users = JSON.parse(JSON.stringify(INITIAL_STATE.users));
+            }
+
             const currentUser = getCurrentUser();
             tbody.innerHTML = state.users.map(u => {
                 const isSelf = currentUser && currentUser.id === u.id;
-                const roleBadge = u.role === 'admin'
-                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">Admin Penuh</span>`
-                    : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold">Petugas Input (Terbatas)</span>`;
+                const isAdminRole = u.role === 'admin';
+                const isActive = u.active !== false;
 
-                const statusBadge = u.active !== false
-                    ? `<span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">Aktif</span>`
-                    : `<span class="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold">Nonaktif</span>`;
+                const roleBadge = isAdminRole
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">Admin Penuh</span>`
+                    : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold">Petugas Input (Terbatas)</span>`;
+
+                const statusBadge = isActive
+                    ? `<span class="inline-flex px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold">Aktif</span>`
+                    : `<span class="inline-flex px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[11px] font-bold">Nonaktif</span>`;
 
                 return `
                     <tr class="hover:bg-slate-50/90 transition">
                         <td class="py-3.5 px-5 font-bold text-slate-900">
                             ${u.fullName}
-                            ${isSelf ? '<span class="ml-1.5 px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold">Akun Anda</span>' : ''}
+                            ${isSelf ? '<span class="ml-1.5 px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold">Anda</span>' : ''}
                         </td>
                         <td class="py-3.5 px-5 font-mono text-xs font-semibold text-slate-700">${u.username}</td>
                         <td class="py-3.5 px-5 font-mono text-xs text-slate-500">${u.password}</td>
                         <td class="py-3.5 px-5">${roleBadge}</td>
                         <td class="py-3.5 px-5 text-center">${statusBadge}</td>
                         <td class="py-3.5 px-5 text-right">
-                            <div class="inline-flex items-center gap-1.5">
+                            <div class="inline-flex items-center justify-end gap-1.5">
                                 <button type="button" onclick="openUserModal('${u.id}')" title="Edit Akun"
-                                    class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition">
-                                    Edit
+                                    class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition">
+                                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                                 </button>
                                 ${!isSelf ? `
-                                    <button type="button" onclick="toggleUserActiveStatus('${u.id}')"
-                                        class="px-2.5 py-1.5 rounded-lg border border-amber-200 hover:bg-amber-50 text-amber-700 text-xs font-bold transition">
-                                        ${u.active !== false ? 'Nonaktifkan' : 'Aktifkan'}
+                                    <button type="button" onclick="toggleUserActiveStatus('${u.id}')" title="${isActive ? 'Nonaktifkan Akun' : 'Aktifkan Akun'}"
+                                        class="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-amber-50 text-slate-700 hover:text-amber-700 text-xs font-semibold transition">
+                                        ${isActive ? 'Nonaktifkan' : 'Aktifkan'}
                                     </button>
                                     <button type="button" onclick="deleteUserAccount('${u.id}')" title="Hapus Akun"
                                         class="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 transition">
@@ -4907,31 +5570,34 @@
         }
 
         function openUserModal(userId = null) {
-            if (!isAdminUser()) return;
+            if (!isAdminUser()) {
+                showToast('Akses ditolak: Hanya Admin yang dapat mengelola akun pengguna.', 'error');
+                return;
+            }
             const modal = document.getElementById('user-account-modal');
             const titleEl = document.getElementById('user-modal-title');
-            const editIdEl = document.getElementById('input-edit-user-id');
-            const nameEl = document.getElementById('input-user-fullname');
-            const unameEl = document.getElementById('input-user-username');
-            const passEl = document.getElementById('input-user-password');
-            const roleEl = document.getElementById('input-user-role');
+            const idInput = document.getElementById('input-edit-user-id');
+            const nameInput = document.getElementById('input-user-fullname');
+            const unameInput = document.getElementById('input-user-username');
+            const passInput = document.getElementById('input-user-password');
+            const roleSelect = document.getElementById('input-user-role');
 
             if (userId) {
                 const u = state.users.find(item => item.id === userId);
                 if (!u) return;
                 titleEl.textContent = 'Edit Akun Pengguna';
-                editIdEl.value = u.id;
-                nameEl.value = u.fullName;
-                unameEl.value = u.username;
-                passEl.value = u.password;
-                roleEl.value = u.role;
+                idInput.value = u.id;
+                nameInput.value = u.fullName;
+                unameInput.value = u.username;
+                passInput.value = u.password;
+                roleSelect.value = u.role;
             } else {
                 titleEl.textContent = 'Buat Akun Pengguna Baru';
-                editIdEl.value = '';
-                nameEl.value = '';
-                unameEl.value = '';
-                passEl.value = '';
-                roleEl.value = 'operator';
+                idInput.value = '';
+                nameInput.value = '';
+                unameInput.value = '';
+                passInput.value = '';
+                roleSelect.value = 'operator';
             }
 
             modal.classList.remove('hidden');
@@ -4948,18 +5614,18 @@
 
             const editId = document.getElementById('input-edit-user-id').value;
             const fullName = document.getElementById('input-user-fullname').value.trim();
-            const username = document.getElementById('input-user-username').value.trim().toLowerCase().replace(/\s+/g, '_');
+            const username = document.getElementById('input-user-username').value.trim().toLowerCase().replace(/\s+/g, '');
             const password = document.getElementById('input-user-password').value.trim();
             const role = document.getElementById('input-user-role').value;
 
             if (!fullName || !username || password.length < 4) {
-                showToast('Harap isi nama, username, dan kata sandi minimal 4 karakter.', 'error');
+                showToast('Lengkapi Nama, Username, dan Kata Sandi (minimal 4 karakter).', 'error');
                 return;
             }
 
-            const duplicate = state.users.find(u => u.username.toLowerCase() === username && u.id !== editId);
-            if (duplicate) {
-                showToast(`Username "${username}" sudah digunakan oleh akun lain.`, 'error');
+            const dup = state.users.find(u => u.username.toLowerCase() === username && u.id !== editId);
+            if (dup) {
+                showToast(`Username "${username}" sudah digunakan oleh ${dup.fullName}.`, 'error');
                 return;
             }
 
@@ -4981,12 +5647,11 @@
                     role,
                     active: true
                 });
-                showToast(`Akun baru "${username}" (${role === 'admin' ? 'Admin' : 'Petugas Input'}) berhasil dibuat.`);
+                showToast(`Akun baru "${username}" berhasil dibuat.`);
             }
 
             saveState();
-            applyRolePermissionsUI();
-            renderUsersManagementTable();
+            renderAll();
             closeUserModal();
         }
 
@@ -4994,7 +5659,7 @@
             if (!isAdminUser()) return;
             const u = state.users.find(item => item.id === userId);
             if (!u) return;
-            u.active = u.active === false ? true : false;
+            u.active = (u.active === false) ? true : false;
             saveState();
             renderUsersManagementTable();
             showToast(`Status akun ${u.fullName} diubah menjadi ${u.active ? 'Aktif' : 'Nonaktif'}.`);
@@ -5002,13 +5667,19 @@
 
         function deleteUserAccount(userId) {
             if (!isAdminUser()) return;
+            const currentUser = getCurrentUser();
+            if (currentUser && currentUser.id === userId) {
+                showToast('Anda tidak dapat menghapus akun yang sedang digunakan.', 'error');
+                return;
+            }
             const idx = state.users.findIndex(u => u.id === userId);
-            if (idx === -1) return;
-            const removed = state.users[idx].fullName;
-            state.users.splice(idx, 1);
-            saveState();
-            renderUsersManagementTable();
-            showToast(`Akun ${removed} telah dihapus.`);
+            if (idx !== -1) {
+                const removed = state.users[idx].fullName;
+                state.users.splice(idx, 1);
+                saveState();
+                renderUsersManagementTable();
+                showToast(`Akun ${removed} telah dihapus.`);
+            }
         }
 
         // ==========================================
@@ -5027,6 +5698,7 @@
                 renderBackupPage();
                 renderOfficialReportPage();
                 renderUsersManagementTable();
+                renderHomeroomTable();
                 safeRefreshIcons();
             } catch (err) {
                 console.error('Terjadi kesalahan saat merender tampilan:', err);
